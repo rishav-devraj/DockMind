@@ -1,6 +1,7 @@
 package com.dockmind.domain;
 
 import com.dockmind.matching.Discrepancy;
+import com.dockmind.matching.Matcher;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,7 +18,7 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "receipt_lines")
-public class ReceiptLine {
+public class ReceiptLine implements Matcher.Line {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "receipt_line_seq")
     @SequenceGenerator(name = "receipt_line_seq", sequenceName = "receipt_line_seq", allocationSize = 1)
