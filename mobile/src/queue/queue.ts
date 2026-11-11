@@ -27,6 +27,7 @@ export interface QueueStore {
   /** All items, oldest first. */
   list(): Promise<QueueItem[]>;
   update(id: number, patch: QueuePatch): Promise<void>;
+  remove(id: number): Promise<void>;
 }
 
 export type UploadOutcome = { kind: 'retry'; reason: string } | { kind: 'fail'; reason: string };
@@ -87,6 +88,20 @@ export class UploadQueue {
     await this.publish();
     void this.drain();
     return created;
+  }
+
+  /**
+   * The clerk removes a WAITING or FAILED item. Returns false if it was not removed:
+   * an upload in flight cannot be stopped safely, and a synced item is already on the server.
+   */
+  async cancel(id: number): Promise<boolean> {
+    await this.start();
+    const item = (await this.deps.store.list()).find((candidate) => candidate.id === id);
+    if (!item || item.status === 'UPLOADING' || item.status === 'SYNCED') return false;
+    await this.deps.store.remove(id);
+    await this.publish();
+    void this.drain();
+    return true;
   }
 
   /** The clerk's manual retry of a FAILED item. The key stays the same. */

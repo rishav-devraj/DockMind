@@ -29,6 +29,20 @@ export const uploadQueue = new UploadQueue({
   },
 });
 
+/** Removes a WAITING or FAILED item and its saved photo. Returns false if it could not be removed. */
+export async function cancelUpload(item: QueueItem): Promise<boolean> {
+  const removed = await uploadQueue.cancel(item.id);
+  if (removed) {
+    try {
+      const file = new File(item.photoUri);
+      if (file.exists) file.delete();
+    } catch (error) {
+      console.warn('Could not delete the saved photo', error);
+    }
+  }
+  return removed;
+}
+
 /** Starts draining and keeps doing so on reconnect and on return to the foreground. */
 export function startUploadQueue(): () => void {
   const wake = () => {

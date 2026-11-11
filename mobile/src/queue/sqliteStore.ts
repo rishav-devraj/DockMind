@@ -60,6 +60,11 @@ export const sqliteQueueStore: QueueStore = {
     return rows.map(toItem);
   },
 
+  async remove(id: number) {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM queue_items WHERE id = ?', id);
+  },
+
   async update(id: number, patch: QueuePatch) {
     const entries = Object.entries(patch) as [keyof QueuePatch, string | number | null][];
     if (entries.length === 0) return;

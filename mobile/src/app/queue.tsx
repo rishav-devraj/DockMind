@@ -5,7 +5,7 @@ import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Message } from '@/components/ui';
 import type { QueueItem, QueueStatus } from '@/queue/queue';
-import { uploadQueue, useQueueItems } from '@/queue/runtime';
+import { cancelUpload, uploadQueue, useQueueItems } from '@/queue/runtime';
 import { colors, spacing, type } from '@/theme';
 
 const STATUS: Record<QueueStatus, { label: string; bg: string; text: string }> = {
@@ -58,6 +58,9 @@ function QueueRow({ item }: { item: QueueItem }) {
       {item.lastError ? <Text style={styles.error}>{item.lastError}</Text> : null}
       {item.status === 'FAILED' ? (
         <Button label="Try again" onPress={() => void uploadQueue.retry(item.id)} />
+      ) : null}
+      {item.status === 'WAITING' || item.status === 'FAILED' ? (
+        <Button label="✕ Cancel upload" variant="secondary" onPress={() => void cancelUpload(item)} />
       ) : null}
       {item.receiptId ? (
         <Button

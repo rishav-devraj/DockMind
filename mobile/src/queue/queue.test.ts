@@ -33,6 +33,10 @@ class MemoryStore implements QueueStore {
   async update(id: number, patch: QueuePatch) {
     Object.assign(this.items.find((item) => item.id === id)!, patch);
   }
+
+  async remove(id: number) {
+    this.items = this.items.filter((item) => item.id !== id);
+  }
 }
 
 function harness(store = new MemoryStore()) {
@@ -187,6 +191,33 @@ describe('UploadQueue', () => {
     await h.queue.drain();
 
     expect(h.store.items.map((row) => row.status)).toEqual(['FAILED', 'SYNCED']);
+  });
+
+  it('cancels a WAITING item so it never uploads, and lets later items go', async () => {
+    const h = harness();
+    h.setUpload(async (row) => {
+      if (row.idempotencyKey === 'a') throw new NetworkError('Network request failed');
+      return 'RCP-2';
+    });
+    await h.queue.enqueue(item('a'));
+    await h.queue.enqueue(item('b'));
+    await h.queue.drain();
+
+    expect(await h.queue.cancel(1)).toBe(true);
+    await h.queue.drain();
+
+    expect(h.store.items.map((row) => row.idempotencyKey)).toEqual(['b']);
+    expect(h.store.items[0].status).toBe('SYNCED');
+    expect(h.calls).toEqual(['a', 'b']);
+  });
+
+  it('refuses to cancel a synced item', async () => {
+    const h = harness();
+    await h.queue.enqueue(item('a'));
+    await h.queue.drain();
+
+    expect(await h.queue.cancel(1)).toBe(false);
+    expect(h.store.items).toHaveLength(1);
   });
 
   it('retries a FAILED item by hand with the same key', async () => {
