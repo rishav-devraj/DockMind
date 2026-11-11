@@ -1,10 +1,10 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { plainMessage } from '@/api/errors';
 import type { PurchaseOrder } from '@/api/types';
-import { Card, Loading, Message, Notice } from '@/components/ui';
+import { Button, Card, Loading, Message, Notice } from '@/components/ui';
 import { loadOpenPurchaseOrders, PurchaseOrderList } from '@/lib/poCache';
 import { colors, spacing, type } from '@/theme';
 
@@ -70,6 +70,9 @@ export default function OpenPurchaseOrders() {
     <View style={styles.screen}>
       <Stack.Screen options={{ title: 'Open POs' }} />
       {body}
+      <View style={styles.footer}>
+        <Button label="Capture delivery note" onPress={() => router.push('/capture')} />
+      </View>
     </View>
   );
 }
@@ -94,6 +97,7 @@ function OrderCard({ order }: { order: PurchaseOrder }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
+  footer: { padding: spacing.lg, backgroundColor: colors.surface },
   poNumber: { fontSize: type.title, fontWeight: '700', color: colors.text },
   supplier: { fontSize: type.body, color: colors.textMuted },
   line: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },

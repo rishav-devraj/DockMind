@@ -24,7 +24,15 @@
     "plugins": [
       "expo-sqlite",
       "expo-build-properties",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DockMind reads a photo of the delivery note when the camera cannot be used.",
+          "cameraPermission": "DockMind photographs delivery notes so they can be checked against the purchase order.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "dockmind"
   }
