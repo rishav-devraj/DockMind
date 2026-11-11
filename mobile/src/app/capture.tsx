@@ -8,6 +8,7 @@ import { saveCapture } from '@/capture/saveCapture';
 import { Screen } from '@/components/Screen';
 import { Button, Notice } from '@/components/ui';
 import { apiMode } from '@/config';
+import { isOnline } from '@/lib/network';
 import { colors, spacing, tapTarget, type } from '@/theme';
 
 // X-Fixture picks the test note. It is only useful in development and is ignored by the real reader.
@@ -34,8 +35,10 @@ export default function Capture() {
       const result = await pick();
       if (result.kind === 'denied') setProblem(result.message);
       if (result.kind === 'picked') {
-        await saveCapture(result.asset, showFixtures ? fixture : null);
-        router.replace('/queue');
+        const item = await saveCapture(result.asset, showFixtures ? fixture : null);
+        // With no signal the clerk may capture several notes, so show the queue instead.
+        if (isOnline()) router.replace({ pathname: '/review', params: { itemId: String(item.id) } });
+        else router.replace('/queue');
       }
     } catch {
       setProblem('Could not save that photo. Try taking it again.');

@@ -80,6 +80,7 @@ export default function OpenPurchaseOrders() {
           variant="secondary"
           onPress={() => router.push('/queue')}
         />
+        <Button label="Receipts" variant="secondary" onPress={() => router.push('/receipts')} />
       </View>
     </Screen>
   );

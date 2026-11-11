@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useMemo } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 
@@ -58,6 +58,15 @@ function QueueRow({ item }: { item: QueueItem }) {
       {item.lastError ? <Text style={styles.error}>{item.lastError}</Text> : null}
       {item.status === 'FAILED' ? (
         <Button label="Try again" onPress={() => void uploadQueue.retry(item.id)} />
+      ) : null}
+      {item.receiptId ? (
+        <Button
+          label="Open receipt"
+          variant="secondary"
+          onPress={() =>
+            router.push({ pathname: '/review', params: { receiptId: item.receiptId ?? '' } })
+          }
+        />
       ) : null}
     </Card>
   );
