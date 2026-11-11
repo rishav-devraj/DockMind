@@ -606,8 +606,9 @@ sequenceDiagram
     <h2>Read, validate, then save</h2>
     <div class="flow" style="margin-top:20px">
       <div class="node peach">ExtractionRunner<small>executor thread</small></div><div class="arrow">→</div>
-      <div class="node lav">Extractor<small>Llm or Fixture</small></div><div class="arrow">→</div>
+      <div class="node lav">Extractor<small>photo only, thinking off</small></div><div class="arrow">→</div>
       <div class="node mint">ExtractionValidator<small>one path for all output</small></div><div class="arrow">→</div>
+      <div class="node butter">PO lookup<small>indexed, by written number</small></div><div class="arrow">→</div>
       <div class="node sky">applyExtraction<small>row lock, CAPTURED only</small></div>
     </div>
     <div class="grid g2" style="margin-top:18px">
@@ -672,6 +673,7 @@ sequenceDiagram
         <p>A PO is resolved only when <code>poNumber</code> exists <b>and</b> the note's supplier matches that PO's supplier. Matching ignores case, punctuation, and suffixes such as <i>Ltd</i>, <i>Co</i> and <i>Inc</i>.</p>
         <p style="margin-top:10px"><span class="pill rose">PO-4503</span> and <span class="pill rose">PO-4513</span> differ by one digit. The supplier check is what separates them.</p>
         <p style="margin-top:10px">On a mismatch, <code>poNumber</code> is null, every link is cleared, and the receipt goes to <b>NEEDS_MANUAL</b>.</p>
+        <p style="margin-top:10px">The reader is never shown the PO list. Code looks up the written number with one indexed query, so "po 4502" finds PO-4502.</p>
       </div>
       <div class="glass">
         <h3>What the clerk can change</h3>
@@ -729,8 +731,8 @@ sequenceDiagram
         <table>
           <thead><tr><th>#</th><th>Route</th><th>Success</th></tr></thead>
           <tbody>
-            <tr><td>A1</td><td>GET /purchase-orders?status=OPEN</td><td>200</td></tr>
-            <tr><td>A2</td><td>GET /receipts?status=</td><td>200</td></tr>
+            <tr><td>A1</td><td>GET /purchase-orders?status=OPEN&amp;q=&amp;page=&amp;size=</td><td>200, paged</td></tr>
+            <tr><td>A2</td><td>GET /receipts?status=&amp;page=&amp;size=</td><td>200, paged</td></tr>
             <tr><td>A3</td><td>GET /receipts/{id}</td><td>200</td></tr>
             <tr><td>A4</td><td>POST /receipts</td><td>202 new · 200 replay</td></tr>
             <tr><td>A5</td><td>PATCH /receipts/{id}/lines/{lineId}</td><td>200</td></tr>
@@ -747,7 +749,7 @@ sequenceDiagram
         <div class="glass" style="margin-top:16px">
           <h3>Status codes</h3>
           <p><b>400</b> bad input · <b>404</b> unknown receipt, line or PO · <b>409</b> wrong state · <b>413</b> photo too large.</p>
-          <p style="margin-top:8px">Added beyond the brief, and documented in CONTRACT.md: A8 and A9, plus <code>GET /health</code>.</p>
+          <p style="margin-top:8px">Added beyond the brief, and documented in CONTRACT.md: A8 and A9, plus <code>GET /health</code>. Lists return pages of 50 by default and the total in <code>X-Total-Count</code>. Swagger UI is at <code>/swagger-ui.html</code>.</p>
         </div>
       </div>
     </div>
@@ -763,7 +765,7 @@ sequenceDiagram
           <tbody>
             <tr><td>EXTRACTOR_TYPE</td><td>fixture · or <code>llm</code></td></tr>
             <tr><td>LLM_API_KEY</td><td>none · Gemini key, read from env or <code>.env</code></td></tr>
-            <tr><td>LLM_MODEL</td><td>gemini-2.5-flash · any vision model</td></tr>
+            <tr><td>LLM_MODEL</td><td>gemini-3.1-flash-lite · any vision model</td></tr>
             <tr><td>PORT</td><td>8080 · set by the host</td></tr>
             <tr><td>DOCKMIND_DATA</td><td>./data · H2 folder</td></tr>
           </tbody>
@@ -775,9 +777,136 @@ sequenceDiagram
           <li>Keys live in the environment, never in the image or the repository.</li>
           <li>Fixture mode runs the whole app with no network, which the demo fallback relies on.</li>
           <li>Both extractors feed the same validator, so the lifecycle does not change when the model does.</li>
+          <li>Thinking is off for every read (<code>thinkingBudget: 0</code>). With thinking on, the model timed out.</li>
         </ul>
       </div>
     </div>
+  </section>
+
+  <!-- ===== ARCHITECTURE AS BUILT (Mermaid) ===== -->
+  <section class="slide" data-title="Architecture as built">
+    <div class="chapter-tag">04 · Architecture as built today</div>
+    <h2>The pieces, and who talks to whom</h2>
+    <div class="glass" style="padding:14px 18px;overflow:visible">
+      <pre class="mermaid" data-diagram="pieces" style="overflow:visible;min-height:0">
+flowchart TB
+  subgraph Clients
+    App["Mobile app&lt;br/&gt;Expo, offline queue in SQLite"]
+    Swagger["Swagger UI&lt;br/&gt;/swagger-ui.html"]
+  end
+  subgraph Server["Spring Boot API"]
+    API["REST controllers&lt;br/&gt;A1 to A9, paged lists"]
+    Worker["Extraction worker&lt;br/&gt;background threads"]
+    Extractor{"Extractor&lt;br/&gt;EXTRACTOR_TYPE"}
+    Fixture["FixtureExtractor&lt;br/&gt;kit answers"]
+    LLM["LlmExtractor&lt;br/&gt;photo only"]
+    Validator["ExtractionValidator&lt;br/&gt;untrusted input check"]
+    Lookup["PO lookup&lt;br/&gt;indexed, by PO number"]
+    Matcher["Matcher&lt;br/&gt;all discrepancy rules"]
+  end
+  DB[("H2 database&lt;br/&gt;POs, receipts, photos")]
+  Gemini["Gemini vision model"]
+  App -->|"HTTP + Idempotency-Key"| API
+  Swagger --> API
+  API --> DB
+  API -->|"new receipt id"| Worker
+  Worker --> Extractor
+  Extractor --> Fixture
+  Extractor --> LLM
+  LLM -->|"photo + prompt"| Gemini
+  Worker --> Validator
+  Validator --> Lookup
+  Lookup --> DB
+  Validator --> Matcher
+  Matcher --> DB
+      </pre>
+    </div>
+    <p style="margin-top:12px"><b>The model only reads.</b> It gets the photo and a JSON shape, never the list of purchase orders. <b>Code decides.</b> The validator checks the answer, the PO lookup finds the order, and the matcher classifies every line.</p>
+  </section>
+
+  <section class="slide" data-title="One note as built">
+    <div class="chapter-tag">04 · Architecture as built · One note</div>
+    <h2>Shutter to database row, today</h2>
+    <div class="glass" style="padding:14px 18px">
+      <pre class="mermaid" data-diagram="note">
+sequenceDiagram
+  autonumber
+  participant Phone as Mobile app
+  participant API as Spring Boot API
+  participant DB as H2 database
+  participant W as Extraction worker
+  participant G as Gemini
+  Phone->>Phone: Save photo and key in SQLite
+  Phone->>API: POST /receipts (photo, Idempotency-Key)
+  API->>DB: Insert receipt + photo in one transaction
+  API-->>Phone: 202 CAPTURED
+  API->>W: Read receipt in the background
+  W->>G: Photo and JSON shape only, thinking off
+  G-->>W: supplier, PO number, lines, confidences, note
+  W->>W: Validate: strip fences, coerce numbers, clamp confidence
+  W->>DB: Indexed lookup of the written PO number
+  W->>W: Supplier must agree, then match each line
+  W->>DB: EXTRACTED or NEEDS_MANUAL
+  loop until the receipt leaves CAPTURED
+    Phone->>API: GET /receipts/{id}
+  end
+  API-->>Phone: Lines with discrepancies
+      </pre>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Read first, then look up">
+    <div class="chapter-tag">04 · Architecture as built · Scaling the read</div>
+    <h2>Read first, then look up</h2>
+    <div>
+      <div class="glass" style="padding:14px 16px">
+        <pre class="mermaid" data-diagram="lookup">
+flowchart LR
+  Photo["Photo"] --> Read["Model reads the note only"]
+  Read --> Fields["Supplier, PO number, lines"]
+  Fields --> HasPo{"PO number&lt;br/&gt;readable?"}
+  HasPo -->|yes| Lookup["Indexed lookup by po_number&lt;br/&gt;one row, not 100,000"]
+  Lookup --> Agree{"Found, open and&lt;br/&gt;supplier agrees?"}
+  Agree -->|yes| Match["Link lines, then Matcher"]
+  Match --> Extracted["EXTRACTED"]
+  HasPo -->|no| Manual["NEEDS_MANUAL&lt;br/&gt;clerk picks the PO"]
+  Agree -->|no| Manual
+        </pre>
+      </div>
+      <div>
+        <div class="glass" style="margin-bottom:14px"><h3>Built</h3><p>The prompt no longer carries the PO list. The PO is found by an indexed lookup that also reads "po 4502" as PO-4502. A1 and A2 are paged, with <code>q</code>, <code>page</code> and <code>size</code>, and the total comes back in <code>X-Total-Count</code>.</p></div>
+        <div class="glass"><h3>Still open</h3><p>Postgres and object storage for photos, so more than one server can run and nothing is lost on restart. A durable job queue in place of the in-memory read threads.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Scale table">
+    <div class="chapter-tag">04 · Architecture as built · What breaks at 100,000 orders</div>
+    <h2>Correctness holds, data access is being fixed</h2>
+    <div class="glass" style="padding:16px 22px">
+      <table>
+        <thead><tr><th>Part</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Prompt to the model</td><td><span class="pill mint">fixed</span> photo only, the PO list is no longer sent</td></tr>
+          <tr><td>PO lookup per photo</td><td><span class="pill mint">fixed</span> one indexed query on <code>po_number</code></td></tr>
+          <tr><td>A1 open POs</td><td><span class="pill mint">fixed</span> paged, searchable with <code>q</code></td></tr>
+          <tr><td>A2 receipts</td><td><span class="pill mint">fixed</span> paged, newest first</td></tr>
+          <tr><td>Idempotent capture, validation, matching</td><td><span class="pill mint">sound</span> unchanged by the scale work</td></tr>
+          <tr><td>Database</td><td><span class="pill peach">open</span> embedded H2, one server, photos as blobs</td></tr>
+          <tr><td>Background reads</td><td><span class="pill peach">open</span> in-memory pool of 2 threads, not shared across servers</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px">The model reads, code decides, every answer is validated, and capture is idempotent end to end.</p>
+  </section>
+
+  <section class="slide" data-title="Swagger API docs">
+    <div class="chapter-tag">04 · API documentation</div>
+    <h2>Swagger UI, live from the running backend</h2>
+    <div class="glass" style="padding:12px">
+      <img src="screenshots/swagger-ui.png" alt="Swagger UI listing the DockMind receipt endpoints" style="width:100%;border-radius:18px;display:block">
+    </div>
+    <p style="margin-top:12px">Served at <code>/swagger-ui.html</code>, generated from the controllers. The OpenAPI document is at <code>/v3/api-docs</code>.</p>
   </section>
 
   <!-- ===== CHAPTER 05 WALKTHROUGH ===== -->
@@ -831,8 +960,8 @@ sequenceDiagram
       </div>
       <div class="glass">
         <h3>Not yet verified</h3>
-        <p>The real Gemini vision call against the messy note, and the airplane-mode demo on a device. DECISIONS.md flags both.</p>
-        <div style="margin-top:12px"><span class="pill peach">real vision call</span><span class="pill peach">airplane demo</span></div>
+        <p>The real vision call has run on all nine kit notes, each in 2 to 6 seconds. Note 3 was read with a guessed digit and not flagged. Still open: the airplane-mode demo on a device, and the app's emulator run.</p>
+        <div style="margin-top:12px"><span class="pill peach">airplane demo</span><span class="pill peach">emulator run</span></div>
       </div>
       <div class="glass">
         <h3>Cut for time</h3>
@@ -882,7 +1011,8 @@ sequenceDiagram
           signalColor: '#5d5778', signalTextColor: '#2f2a4a', labelBoxBkgColor: '#ffdbe6',
           fontSize: '16px', edgeLabelBackground: '#fbf7ff'
         },
-        sequence: { actorFontSize: 16, messageFontSize: 15, noteFontSize: 14, actorMargin: 40, width: 150 }
+        sequence: { actorFontSize: 16, messageFontSize: 15, noteFontSize: 14, actorMargin: 40, width: 150 },
+        flowchart: { htmlLabels: false, useMaxWidth: true, padding: 26, nodeSpacing: 40, rankSpacing: 60, wrappingWidth: 260 }
       });
       mermaidReady = true;
     }
@@ -891,7 +1021,11 @@ sequenceDiagram
       var nodes = slide.querySelectorAll('pre.mermaid:not([data-done])');
       if (!nodes.length) return;
       Array.prototype.forEach.call(nodes, function (n) { n.setAttribute('data-done', '1'); });
-      try { mermaid.run({ nodes: nodes }); } catch (e) { /* diagram failed: slide still readable */ }
+      var draw = function () {
+        try { mermaid.run({ nodes: nodes }); } catch (e) { /* diagram failed: slide still readable */ }
+      };
+      // Measure text only after the web font has loaded, or labels come out too narrow.
+      if (document.fonts && document.fonts.ready) { document.fonts.ready.then(draw); } else { draw(); }
     }
     var counter = document.getElementById('counter');
     var bar = document.getElementById('bar');
