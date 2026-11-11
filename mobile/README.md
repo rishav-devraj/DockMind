@@ -2,7 +2,7 @@
 
 The Expo app a receiving clerk uses at the dock: photograph a delivery note, review it against the purchase order, correct quantities, then confirm or dispute. Capture keeps working with no signal.
 
-The app talks to the real backend, by default the one hosted at `https://dockmind-bsxe.onrender.com`.
+The app talks to the real backend, by default the one hosted at `https://dockmind-1.onrender.com`.
 
 ## Run it
 
@@ -33,7 +33,7 @@ npx expo export --platform android
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `EXPO_PUBLIC_API_URL` | `https://dockmind-bsxe.onrender.com` | Backend address. For a server on this PC, use `http://10.0.2.2:8080` from the Android emulator. Restart with `npx expo start -c` after changing it. |
+| `EXPO_PUBLIC_API_URL` | `https://dockmind-1.onrender.com` | Backend address. For a server on this PC, use `http://10.0.2.2:8080` from the Android emulator. Restart with `npx expo start -c` after changing it. |
 
 ## How it is built
 

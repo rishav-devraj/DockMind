@@ -5,7 +5,7 @@ import { defineConfig } from 'vite'
 // The API sends no CORS headers, so the page calls these paths and Vite forwards them.
 // Override with LOCAL_API or HOSTED_API to point either one somewhere else.
 const local = process.env.LOCAL_API || 'http://localhost:8080'
-const hosted = process.env.HOSTED_API || 'https://dockmind-bsxe.onrender.com'
+const hosted = process.env.HOSTED_API || 'https://dockmind-1.onrender.com'
 
 const forward = (prefix: string, target: string) => ({
   target,
