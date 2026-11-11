@@ -45,6 +45,8 @@ npx expo export --platform android
 
 Every capture follows one path: save the photo to app storage, generate the idempotency key, write a SQLite row, then try the upload. The queue uploads in order, one at a time, with backoff. A row left `UPLOADING` by an app kill returns to `WAITING` with the same key.
 
+On the Upload queue screen, a clerk can cancel a `WAITING` or `FAILED` item with the ✕ button. That removes the row and its saved photo from the phone. It cannot cancel an upload in progress or an item already `SYNCED`, since the server already has that receipt. A failed row shows the HTTP status with the reason, for example `(HTTP 400)`, or `(no HTTP response)` when the request never got an answer. The raw error is also logged to the Metro console.
+
 The app does no matching. It shows the `discrepancy` and `delta` the server sends.
 
 ## Status
@@ -91,6 +93,7 @@ All nine APIs now call the real backend through `http.ts`. The screens were exer
 | iPhone could not connect over Wi-Fi | The PC's Wi-Fi is set to Public and Windows Firewall has no rule for Node | Tried a tunnel instead |
 | `--tunnel` failed with "Install @expo/ngrok and try again" straight after installing it | Expo installed it globally and could not find it, likely because this machine has more than one Node setup | `npm install --no-save @expo/ngrok@^4.1.0` inside `mobile`. A later `npm install` may remove it |
 | Tunnel still did not work on the iPhone | Not found | Moved to the emulator |
+| Photos never reached the server; the queue row showed "no HTTP response" and the log said `Unsupported FormDataPart implementation` | The `{ uri, name, type }` form part is not accepted on Expo SDK 58, so fetch failed before sending | The photo is attached as an `expo-file-system` `File` (a Blob) with an explicit filename |
 
 **Testing tips**
 
