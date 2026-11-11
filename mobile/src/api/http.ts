@@ -116,11 +116,17 @@ export class HttpApiClient implements ApiClient {
         throw new NetworkError(timedOut ? 'Request timed out' : 'Network request failed', timedOut);
       }
 
-      if (!response.ok) throw toApiError(response.status, text);
+      const route = `${init.method ?? 'GET'} ${this.baseUrl}${path}`;
+      if (!response.ok) {
+        const error = toApiError(response.status, text);
+        console.warn(`[api] ${route} -> HTTP ${response.status}: ${error.message}`, text.slice(0, 500));
+        throw error;
+      }
 
       try {
         return { status: response.status, body: JSON.parse(text) as T };
-      } catch {
+      } catch (error) {
+        console.warn(`[api] ${route} -> HTTP ${response.status}: unreadable body`, text.slice(0, 500), error);
         throw new NetworkError('The server sent an unreadable response');
       }
     } finally {

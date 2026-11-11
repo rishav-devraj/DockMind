@@ -37,7 +37,14 @@ const POLL_MS = 1500
 const POLL_LIMIT_MS = 120_000
 
 async function request<T>(server: Server, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/${server}${path}`, init)
+  const route = `${init?.method ?? 'GET'} /api/${server}${path}`
+  let response: Response
+  try {
+    response = await fetch(`/api/${server}${path}`, init)
+  } catch (error) {
+    console.error(`[api] ${route} failed before a response`, error)
+    throw error
+  }
   const text = await response.text()
   let body: unknown = null
   try {
@@ -46,6 +53,7 @@ async function request<T>(server: Server, path: string, init?: RequestInit): Pro
     // A proxy or a sleeping host can answer with HTML or nothing. Handled below.
   }
   if (!response.ok) {
+    console.error(`[api] ${route} -> HTTP ${response.status}`, body ?? text.slice(0, 500))
     const message = (body as { message?: string } | null)?.message
     if (message) throw new Error(message)
     throw new Error(
