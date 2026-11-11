@@ -1,10 +1,10 @@
 # Decisions
 
-> Re-checked against the code after the backend build. The real Gemini call has not been run yet, so confirm it before submission.
+> Re-checked against the code after the read-first change. The real Gemini model (`gemini-3.1-flash-lite`) has been run on all nine kit notes, locally, with 100,000 open POs in the database.
 
 ## Why is discrepancy logic in code and not in the model, and what stops a bad model answer reaching the database?
 
-A discrepancy can start a dispute with a supplier, so it has to be repeatable and testable, and a model is neither. The model only reads the note and writes a short explanation. One pure matching class compares quantities and units.
+A discrepancy can start a dispute with a supplier, so it has to be repeatable and testable, and a model is neither. The model only reads the note and writes a short explanation. It is not shown the purchase orders: code looks the PO up by the number the model read, and links the lines to it. One pure matching class compares quantities and units.
 
 Every model answer passes through one validation layer before anything is saved. It strips markdown fences, survives bad JSON, coerces numbers, and checks that the PO and each PO line exist and belong together. It also checks that the supplier agrees with the PO, because PO-4503 and PO-4513 differ by a single digit. A missing confidence counts as zero, and a note with no lines is treated as unread, since saving it would report the whole PO as not delivered.
 
@@ -36,5 +36,7 @@ Next: run the real vision call against the messy note, add a README with clone-t
 - Photos are stored in the database, in their own table, so a receipt and its proof of delivery commit together.
 - A receipt stuck in `CAPTURED` after a crash is read again at startup.
 - The server is set up to deploy to Render from a Dockerfile, with HTTPS provided by Render. Keys are host environment variables, never in the image or repository. The API has no login, as the brief scopes it out, so a hosted URL should stay private. On a free instance the H2 file does not survive a restart, and the POs re-seed.
+- The reader reads first and code looks the PO up afterwards. The first version sent every open PO in the prompt, which fails at about 15,000 open POs and let the model fill a smudged digit with a PO it had been shown. See `docs/ARCHITECTURE.md`.
+- A1 and A2 are paged, 50 per page by default, with the total in `X-Total-Count`, and A1 can be searched with `q`. They stay plain arrays so the app keeps working unchanged.
 - Swagger UI is served at `/swagger-ui.html`, generated from the controllers, so the API can be tried without the app. Like the API itself, it has no login.
 - A small React page in `web/` uploads a note and shows the photo beside what the server read, to check the reader without the app. It reaches the API through Vite's proxy, so the API needs no CORS.
