@@ -880,6 +880,23 @@ flowchart LR
     <p style="margin-top:12px">The model returns the PO number exactly as written, or null if any character is unclear. It is never shown the list of POs, so a smudged digit cannot be snapped to an order it has seen.</p>
   </section>
 
+  <section class="slide" data-title="Workflow type">
+    <div class="chapter-tag">04 · Architecture as built · How the workflow runs</div>
+    <h2>A fixed pipeline with one AI step, not an agent</h2>
+    <div class="flow" style="margin-top:20px">
+      <div class="node lav" style="min-width:210px">1 · Read<small>AI: one vision call, photo in, JSON out</small></div><div class="arrow">→</div>
+      <div class="node mint" style="min-width:210px">2 · Validate<small>code: strip, coerce, clamp</small></div><div class="arrow">→</div>
+      <div class="node mint" style="min-width:210px">3 · Look up PO<small>code: one indexed query</small></div><div class="arrow">→</div>
+      <div class="node mint" style="min-width:210px">4 · Check supplier<small>code: must agree</small></div><div class="arrow">→</div>
+      <div class="node mint" style="min-width:210px">5 · Match lines<small>code: discrepancy rules</small></div>
+    </div>
+    <div class="grid g2" style="margin-top:22px">
+      <div class="glass"><h3>What is automatic</h3><p>Every step runs in a fixed order. The model never chooses a step, calls a tool, or searches for orders. It only reads the number on the paper.</p></div>
+      <div class="glass"><h3>Where a person comes in</h3><p>If the PO number is unreadable, the PO is missing, or the supplier does not agree, the receipt goes to <b>NEEDS_MANUAL</b>. The clerk searches the PO list and assigns the PO, then corrects quantities and decides.</p></div>
+    </div>
+    <div class="glass" style="margin-top:16px"><p><b>Not built yet:</b> the step where the model would pick between candidate POs for a supplier. That is planned in docs/ARCHITECTURE.md, not in the code.</p></div>
+  </section>
+
   <section class="slide" data-title="Scale table">
     <div class="chapter-tag">04 · Architecture as built · Measured at 100,004 open POs</div>
     <h2>Correctness holds, and the data access now scales</h2>
@@ -1004,17 +1021,6 @@ flowchart LR
 
 </main>
 
-<!-- Navigation HUD -->
-<nav class="hud" aria-label="Slide navigation">
-  <div class="glass">
-    <button class="btn" id="prev" aria-label="Previous slide">← Back</button>
-    <span class="counter" id="counter">1 / 1</span>
-    <button class="btn" id="next" aria-label="Next slide">Next →</button>
-  </div>
-  <div class="glass"><span class="hint">← → · space · home/end</span></div>
-  <div class="progress" aria-hidden="true"><i id="bar"></i></div>
-</nav>
-
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
 <script>
   (function () {
@@ -1049,10 +1055,6 @@ flowchart LR
       // Measure text only after the web font has loaded, or labels come out too narrow.
       if (document.fonts && document.fonts.ready) { document.fonts.ready.then(draw); } else { draw(); }
     }
-    var counter = document.getElementById('counter');
-    var bar = document.getElementById('bar');
-    var prev = document.getElementById('prev');
-    var next = document.getElementById('next');
     var current = 0;
 
     function show(index) {
@@ -1064,16 +1066,10 @@ flowchart LR
       });
       current = index;
       renderDiagrams(slides[index]);
-      counter.textContent = (index + 1) + ' / ' + slides.length;
-      bar.style.width = ((index + 1) / slides.length * 100) + '%';
-      prev.disabled = index === 0;
-      next.disabled = index === slides.length - 1;
       document.title = 'DockMind · ' + slides[index].getAttribute('data-title');
       try { history.replaceState(null, '', '#' + (index + 1)); } catch (e) { /* storage or history blocked: ignore */ }
     }
 
-    prev.addEventListener('click', function () { show(current - 1); });
-    next.addEventListener('click', function () { show(current + 1); });
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); show(current + 1); }
