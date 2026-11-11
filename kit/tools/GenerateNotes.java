@@ -10,7 +10,7 @@ import java.util.Random;
 import javax.imageio.ImageIO;
 
 /**
- * Draws the three delivery notes in kit/delivery-notes. No starter kit was supplied, so these stand in for it.
+ * Draws the delivery notes in kit/delivery-notes. No starter kit was supplied, so these stand in for it.
  * Run from the repository root: java kit/tools/GenerateNotes.java
  * The random seed is fixed, so the output is repeatable on a machine with the same fonts.
  */
@@ -30,6 +30,20 @@ public class GenerateNotes {
                 {"Salmon fillet", "72", "KG"},
                 {"Scallops", "10", "KG"}}), "png", new File(dir, "note-2-short.png"));
         ImageIO.write(messy(), "png", new File(dir, "note-3-messy.png"));
+        ImageIO.write(printed("Fresh Farm Produce Ltd", "DN-30501", "PO-4501", new String[][] {
+                {"Gala Apples", "220", "KGS"},
+                {"Oranges, Navel", "150", "kg"},
+                {"Lettuce, Romaine", "60", "CASES"}}), "png", new File(dir, "note-4-over.png"));
+        ImageIO.write(printed("Green Valley Eggs", "DN-30502", "PO-4513", new String[][] {
+                {"Eggs, large, tray", "120", "TRAYS"}}), "png", new File(dir, "note-5-eggs.png"));
+        // A clearly printed PO number that belongs to a different supplier.
+        ImageIO.write(printed("Green Valley Eggs", "DN-30503", "PO-4503", new String[][] {
+                {"Eggs, large, tray", "120", "TRAY"}}), "png", new File(dir, "note-6-wrong-supplier.png"));
+        ImageIO.write(printed("Blue Ocean Seafood Co.", "DN-30504", null, new String[][] {
+                {"Salmon fillet", "80", "KG"},
+                {"Tiger Prawns", "40", "KG"}}), "png", new File(dir, "note-7-no-po.png"));
+        ImageIO.write(crossedOut(), "png", new File(dir, "note-8-crossed-out.png"));
+        ImageIO.write(cafeReceipt(), "png", new File(dir, "note-9-not-a-note.png"));
     }
 
     static Graphics2D setup(BufferedImage img) {
@@ -51,7 +65,9 @@ public class GenerateNotes {
         g.drawString("DELIVERY NOTE", 70, 190);
         g.setFont(new Font("Arial", Font.PLAIN, 30));
         g.drawString("Delivery note no: " + noteNo, 70, 260);
-        g.drawString("Purchase order: " + po, 70, 305);
+        if (po != null) {
+            g.drawString("Purchase order: " + po, 70, 305);
+        }
         g.drawString("Deliver to: Harbor Foods Cold Store", 70, 350);
         g.setStroke(new BasicStroke(3));
         g.drawLine(70, 420, W - 70, 420);
@@ -110,7 +126,58 @@ public class GenerateNotes {
         hand(g, small, random, "38 kg", 620, 728);
         hand(g, small.deriveFont(30f), random, "left at bay 3", 90, 944);
         g.dispose();
+        return asPhoto(paper, random, -4.5);
+    }
 
+    /** Handwritten, with one quantity struck through and corrected. The right reading is 78. */
+    static BufferedImage crossedOut() {
+        Random random = new Random(4502);
+        BufferedImage paper = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = setup(paper);
+        g.setColor(new Color(240, 234, 216));
+        g.fillRect(0, 0, W, H);
+        g.setColor(new Color(170, 190, 215));
+        for (int y = 150; y < H; y += 72) {
+            g.drawLine(0, y, W, y);
+        }
+        Color ink = new Color(25, 35, 95);
+        g.setColor(ink);
+        Font hand = new Font("Segoe Print", Font.PLAIN, 42);
+        Font small = hand.deriveFont(34f);
+        hand(g, hand, random, "Blue Ocean Seafood Co.", 70, 125);
+        hand(g, small, random, "delivery note  DN-30505", 70, 215);
+        hand(g, small, random, "PO-4502", 70, 290);
+        hand(g, small, random, "Salmon fillet", 90, 440);
+        hand(g, small, random, "80", 560, 440);
+        g.setStroke(new BasicStroke(5));
+        g.drawLine(548, 432, 628, 412);
+        hand(g, small, random, "78 kg", 660, 440);
+        hand(g, small, random, "Tiger Prawns", 90, 584);
+        hand(g, small, random, "40 kg", 660, 584);
+        g.dispose();
+        return asPhoto(paper, random, 3.0);
+    }
+
+    /** Not a delivery note at all, the kind of thing that gets photographed by mistake. */
+    static BufferedImage cafeReceipt() {
+        BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = setup(img);
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, W, H);
+        g.setColor(Color.BLACK);
+        g.setFont(new Font("Consolas", Font.BOLD, 46));
+        g.drawString("CORNER CAFE", 330, 140);
+        g.setFont(new Font("Consolas", Font.PLAIN, 34));
+        g.drawString("Table 4        Thank you!", 200, 220);
+        g.drawString("2 x Flat white          7.00", 200, 340);
+        g.drawString("1 x Almond croissant    3.80", 200, 400);
+        g.drawString("TOTAL                  10.80", 200, 520);
+        g.drawString("Paid by card", 200, 600);
+        g.dispose();
+        return img;
+    }
+
+    static BufferedImage asPhoto(BufferedImage paper, Random random, double degrees) {
         BufferedImage photo = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
         Graphics2D p = setup(photo);
         p.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -118,7 +185,7 @@ public class GenerateNotes {
         p.fillRect(0, 0, W, H);
         AffineTransform tilt = new AffineTransform();
         tilt.translate(W / 2.0, H / 2.0);
-        tilt.rotate(Math.toRadians(-4.5));
+        tilt.rotate(Math.toRadians(degrees));
         tilt.scale(0.93, 0.93);
         tilt.translate(-W / 2.0, -H / 2.0);
         p.drawImage(paper, tilt, null);

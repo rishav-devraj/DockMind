@@ -1,0 +1,13 @@
+{
+  "supplierName": "Corner Cafe",
+  "deliveryNoteNo": null,
+  "poNumber": null,
+  "poConfidence": 0,
+  "lines": [
+    { "description": "Flat white", "poLineId": null, "qty": 2, "unit": "EA", "confidence": 0.9 },
+    { "description": "Almond croissant", "poLineId": null, "qty": 1, "unit": "EA", "confidence": 0.9 }
+  ],
+  "freeText": null,
+  "overallConfidence": 0.5,
+  "aiNote": "This looks like a cafe receipt, not a delivery note."
+}

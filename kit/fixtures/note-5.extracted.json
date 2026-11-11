@@ -1,0 +1,12 @@
+{
+  "supplierName": "Green Valley Eggs",
+  "deliveryNoteNo": "DN-30502",
+  "poNumber": "PO-4513",
+  "poConfidence": 0.98,
+  "lines": [
+    { "description": "Eggs, large, tray", "poLineId": "POL-4513-1", "qty": 120, "unit": "TRAYS", "confidence": 0.97 }
+  ],
+  "freeText": null,
+  "overallConfidence": 0.97,
+  "aiNote": "Printed and clear."
+}

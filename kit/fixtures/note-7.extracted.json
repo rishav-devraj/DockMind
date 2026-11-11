@@ -1,0 +1,13 @@
+{
+  "supplierName": "Blue Ocean Seafood Co.",
+  "deliveryNoteNo": "DN-30504",
+  "poNumber": null,
+  "poConfidence": 0,
+  "lines": [
+    { "description": "Salmon fillet", "poLineId": null, "qty": 80, "unit": "KG", "confidence": 0.97 },
+    { "description": "Tiger Prawns", "poLineId": null, "qty": 40, "unit": "KG", "confidence": 0.97 }
+  ],
+  "freeText": null,
+  "overallConfidence": 0.9,
+  "aiNote": "There is no PO number on this note."
+}

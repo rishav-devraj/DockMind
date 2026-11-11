@@ -1,0 +1,12 @@
+{
+  "supplierName": "Green Valley Eggs",
+  "deliveryNoteNo": "DN-30503",
+  "poNumber": "PO-4503",
+  "poConfidence": 0.98,
+  "lines": [
+    { "description": "Eggs, large, tray", "poLineId": null, "qty": 120, "unit": "TRAY", "confidence": 0.97 }
+  ],
+  "freeText": null,
+  "overallConfidence": 0.96,
+  "aiNote": "The note is clear, but the PO number printed on it belongs to a different supplier."
+}

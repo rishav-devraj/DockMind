@@ -1,0 +1,13 @@
+{
+  "supplierName": "Blue Ocean Seafood Co.",
+  "deliveryNoteNo": "DN-30505",
+  "poNumber": "PO-4502",
+  "poConfidence": 0.9,
+  "lines": [
+    { "description": "Salmon fillet", "poLineId": "POL-4502-1", "qty": 78, "unit": "KG", "confidence": 0.72 },
+    { "description": "Tiger Prawns", "poLineId": "POL-4502-2", "qty": 40, "unit": "KG", "confidence": 0.9 }
+  ],
+  "freeText": null,
+  "overallConfidence": 0.82,
+  "aiNote": "Handwritten. The salmon quantity was crossed out and corrected to 78, so please check it."
+}

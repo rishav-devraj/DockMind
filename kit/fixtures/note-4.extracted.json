@@ -1,0 +1,14 @@
+{
+  "supplierName": "Fresh Farm Produce Ltd",
+  "deliveryNoteNo": "DN-30501",
+  "poNumber": "PO-4501",
+  "poConfidence": 0.98,
+  "lines": [
+    { "description": "Gala Apples", "poLineId": "POL-4501-1", "qty": 220, "unit": "KGS", "confidence": 0.97 },
+    { "description": "Oranges, Navel", "poLineId": "POL-4501-2", "qty": 150, "unit": "kg", "confidence": 0.97 },
+    { "description": "Lettuce, Romaine", "poLineId": "POL-4501-3", "qty": 60, "unit": "CASES", "confidence": 0.96 }
+  ],
+  "freeText": null,
+  "overallConfidence": 0.97,
+  "aiNote": "Printed and clear. Apples look higher than the order."
+}
