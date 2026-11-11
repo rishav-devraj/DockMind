@@ -1,6 +1,17 @@
 import { ApiError, NetworkError } from './errors';
 import { HttpApiClient } from './http';
 
+// The real File needs the native module. This stand-in is a Blob, which is what FormData requires.
+jest.mock('expo-file-system', () => ({
+  File: class FakeFile extends Blob {
+    readonly uri: string;
+    constructor(uri: string) {
+      super(['photo']);
+      this.uri = uri;
+    }
+  },
+}));
+
 const respond = (status: number, body: string) =>
   ({ ok: status >= 200 && status < 300, status, text: async () => body }) as Response;
 

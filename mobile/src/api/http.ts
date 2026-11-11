@@ -1,3 +1,5 @@
+import { File } from 'expo-file-system';
+
 import type { ApiClient } from './client';
 import { ApiError, NetworkError } from './errors';
 import type {
@@ -39,12 +41,8 @@ export class HttpApiClient implements ApiClient {
 
   async uploadReceipt({ imageUri, idempotencyKey, fixture }: UploadRequest): Promise<UploadResult> {
     const form = new FormData();
-    // React Native's FormData reads a local file from this { uri, name, type } shape.
-    form.append('image', {
-      uri: imageUri,
-      name: 'delivery-note.jpg',
-      type: 'image/jpeg',
-    } as unknown as Blob);
+    // This Expo version rejects the { uri, name, type } shape, so the local file is passed as a File (a Blob).
+    form.append('image', new File(imageUri), 'delivery-note.jpg');
 
     const headers: Record<string, string> = { 'Idempotency-Key': idempotencyKey };
     if (fixture) headers['X-Fixture'] = fixture;
