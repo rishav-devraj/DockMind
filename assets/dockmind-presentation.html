@@ -792,28 +792,30 @@ sequenceDiagram
 flowchart TB
   subgraph Clients
     App["Mobile app&lt;br/&gt;Expo, offline queue in SQLite"]
+    Bench["OCR bench, web preview&lt;br/&gt;web/, React"]
     Swagger["Swagger UI&lt;br/&gt;/swagger-ui.html"]
   end
   subgraph Server["Spring Boot API"]
     API["REST controllers&lt;br/&gt;A1 to A9, paged lists"]
-    Worker["Extraction worker&lt;br/&gt;background threads"]
+    Worker["Extraction worker&lt;br/&gt;2 background threads"]
     Extractor{"Extractor&lt;br/&gt;EXTRACTOR_TYPE"}
     Fixture["FixtureExtractor&lt;br/&gt;kit answers"]
-    LLM["LlmExtractor&lt;br/&gt;photo only"]
+    LLM["LlmExtractor&lt;br/&gt;photo + fixed prompt"]
     Validator["ExtractionValidator&lt;br/&gt;untrusted input check"]
-    Lookup["PO lookup&lt;br/&gt;indexed, by PO number"]
-    Matcher["Matcher&lt;br/&gt;all discrepancy rules"]
+    Lookup["PO lookup&lt;br/&gt;one indexed query"]
+    Matcher["Matcher&lt;br/&gt;linking and all discrepancy rules"]
   end
   DB[("H2 database&lt;br/&gt;POs, receipts, photos")]
   Gemini["Gemini vision model"]
-  App -->|"HTTP + Idempotency-Key"| API
+  App -->|"HTTPS + Idempotency-Key"| API
+  Bench -->|"via Vite proxy"| API
   Swagger --> API
   API --> DB
   API -->|"new receipt id"| Worker
   Worker --> Extractor
   Extractor --> Fixture
   Extractor --> LLM
-  LLM -->|"photo + prompt"| Gemini
+  LLM -->|"photo + fixed prompt"| Gemini
   Worker --> Validator
   Validator --> Lookup
   Lookup --> DB
@@ -821,7 +823,7 @@ flowchart TB
   Matcher --> DB
       </pre>
     </div>
-    <p style="margin-top:12px"><b>The model only reads.</b> It gets the photo and a JSON shape, never the list of purchase orders. <b>Code decides.</b> The validator checks the answer, the PO lookup finds the order, and the matcher classifies every line.</p>
+    <p style="margin-top:12px"><b>The model only reads.</b> The validator decides whether the answer can be trusted, the lookup finds the PO, and the matcher decides what is wrong with the delivery. Nothing the model says reaches the database without passing all three.</p>
   </section>
 
   <section class="slide" data-title="One note as built">
@@ -836,68 +838,88 @@ sequenceDiagram
   participant DB as H2 database
   participant W as Extraction worker
   participant G as Gemini
-  Phone->>Phone: Save photo and key in SQLite
+  Phone->>Phone: Save photo and new key in SQLite
   Phone->>API: POST /receipts (photo, Idempotency-Key)
   API->>DB: Insert receipt + photo in one transaction
+  Note over API,DB: Unique key: a retry gets the same receipt
   API-->>Phone: 202 CAPTURED
   API->>W: Read receipt in the background
-  W->>G: Photo and JSON shape only, thinking off
-  G-->>W: supplier, PO number, lines, confidences, note
-  W->>W: Validate: strip fences, coerce numbers, clamp confidence
-  W->>DB: Indexed lookup of the written PO number
-  W->>W: Supplier must agree, then match each line
+  W->>G: Photo + fixed prompt, no purchase orders
+  G-->>W: Supplier, PO number as written, lines, confidences
+  W->>DB: Look up that one PO by number (indexed)
+  W->>W: Validate: PO open AND supplier agrees
+  W->>W: Link lines by description, then match
   W->>DB: EXTRACTED or NEEDS_MANUAL
   loop until the receipt leaves CAPTURED
     Phone->>API: GET /receipts/{id}
   end
   API-->>Phone: Lines with discrepancies
+  Phone->>API: Correct, confirm or dispute
       </pre>
     </div>
   </section>
 
-  <section class="slide" data-title="Read first, then look up">
-    <div class="chapter-tag">04 · Architecture as built · Scaling the read</div>
-    <h2>Read first, then look up</h2>
-    <div>
-      <div class="glass" style="padding:14px 16px">
-        <pre class="mermaid" data-diagram="lookup">
+  <section class="slide" data-title="Finding the PO">
+    <div class="chapter-tag">04 · Architecture as built · Finding the PO</div>
+    <h2>The model reads the number, code finds the order</h2>
+    <div class="glass" style="padding:14px 16px">
+      <pre class="mermaid" data-diagram="lookup">
 flowchart LR
   Photo["Photo"] --> Read["Model reads the note only"]
-  Read --> Fields["Supplier, PO number, lines"]
+  Read --> Fields["Supplier, PO number as written, lines"]
   Fields --> HasPo{"PO number&lt;br/&gt;readable?"}
-  HasPo -->|yes| Lookup["Indexed lookup by po_number&lt;br/&gt;one row, not 100,000"]
+  HasPo -->|yes| Lookup["Indexed lookup by po_number&lt;br/&gt;po 4502, PO4502, 4502 all match"]
   Lookup --> Agree{"Found, open and&lt;br/&gt;supplier agrees?"}
-  Agree -->|yes| Match["Link lines, then Matcher"]
+  Agree -->|yes| Link["Link lines by description, in code"]
+  Link --> Match["Matcher"]
   Match --> Extracted["EXTRACTED"]
-  HasPo -->|no| Manual["NEEDS_MANUAL&lt;br/&gt;clerk picks the PO"]
+  HasPo -->|no| Manual["NEEDS_MANUAL&lt;br/&gt;clerk searches A1 with q, assigns the PO"]
   Agree -->|no| Manual
-        </pre>
-      </div>
-      <div>
-        <div class="glass" style="margin-bottom:14px"><h3>Built</h3><p>The prompt no longer carries the PO list. The PO is found by an indexed lookup that also reads "po 4502" as PO-4502. A1 and A2 are paged, with <code>q</code>, <code>page</code> and <code>size</code>, and the total comes back in <code>X-Total-Count</code>.</p></div>
-        <div class="glass"><h3>Still open</h3><p>Postgres and object storage for photos, so more than one server can run and nothing is lost on restart. A durable job queue in place of the in-memory read threads.</p></div>
-      </div>
+      </pre>
     </div>
+    <p style="margin-top:12px">The model returns the PO number exactly as written, or null if any character is unclear. It is never shown the list of POs, so a smudged digit cannot be snapped to an order it has seen.</p>
   </section>
 
   <section class="slide" data-title="Scale table">
-    <div class="chapter-tag">04 · Architecture as built · What breaks at 100,000 orders</div>
-    <h2>Correctness holds, data access is being fixed</h2>
+    <div class="chapter-tag">04 · Architecture as built · Measured at 100,004 open POs</div>
+    <h2>Correctness holds, and the data access now scales</h2>
     <div class="glass" style="padding:16px 22px">
       <table>
-        <thead><tr><th>Part</th><th>Status</th></tr></thead>
+        <thead><tr><th>Part</th><th>Before</th><th>Now, measured</th></tr></thead>
         <tbody>
-          <tr><td>Prompt to the model</td><td><span class="pill mint">fixed</span> photo only, the PO list is no longer sent</td></tr>
-          <tr><td>PO lookup per photo</td><td><span class="pill mint">fixed</span> one indexed query on <code>po_number</code></td></tr>
-          <tr><td>A1 open POs</td><td><span class="pill mint">fixed</span> paged, searchable with <code>q</code></td></tr>
-          <tr><td>A2 receipts</td><td><span class="pill mint">fixed</span> paged, newest first</td></tr>
-          <tr><td>Idempotent capture, validation, matching</td><td><span class="pill mint">sound</span> unchanged by the scale work</td></tr>
-          <tr><td>Database</td><td><span class="pill peach">open</span> embedded H2, one server, photos as blobs</td></tr>
-          <tr><td>Background reads</td><td><span class="pill peach">open</span> in-memory pool of 2 threads, not shared across servers</td></tr>
+          <tr><td>Prompt to the model</td><td>Every open PO. Fails near 15,000 POs</td><td><span class="pill mint">fixed</span> 1,771 characters. All nine kit notes read in 2 to 7 s</td></tr>
+          <tr><td>Finding the PO</td><td>Every PO loaded and scanned per photo</td><td><span class="pill mint">fixed</span> one query on the unique <code>po_number</code> index</td></tr>
+          <tr><td>A1 open POs</td><td>Every PO with lines</td><td><span class="pill mint">fixed</span> pages of 50, first page 0.16 s, page 2,000 0.19 s, search 0.05 to 0.07 s</td></tr>
+          <tr><td>A2 receipts</td><td>Every receipt</td><td><span class="pill mint">fixed</span> pages of 50, newest first, under 0.01 s</td></tr>
+          <tr><td>Idempotent capture, validation, matching</td><td>One receipt, one PO</td><td><span class="pill mint">unchanged</span></td></tr>
+          <tr><td>Database</td><td>Embedded H2, one server, photos as blobs</td><td><span class="pill peach">open</span> Postgres and object storage next, so several servers can run. Render's free tier loses data on restart</td></tr>
+          <tr><td>Background reads</td><td>2 in-memory threads, 20 to 30 notes a minute</td><td><span class="pill peach">open</span> crashed reads recover, but work is not shared. A durable job queue is next</td></tr>
         </tbody>
       </table>
     </div>
-    <p style="margin-top:14px">The model reads, code decides, every answer is validated, and capture is idempotent end to end.</p>
+    <p style="margin-top:14px">Measured on a local server with 100,004 POs and 200,000 PO lines, in a 307 MB heap. Supplier search uses a contains match, which is fine at this size but would need full-text search later.</p>
+  </section>
+
+  <section class="slide" data-title="Real model results">
+    <div class="chapter-tag">04 · Architecture as built · Real model</div>
+    <h2>All nine kit notes, read by the live model</h2>
+    <div class="glass" style="padding:16px 22px">
+      <table>
+        <thead><tr><th>Note</th><th>Outcome</th><th>Right?</th></tr></thead>
+        <tbody>
+          <tr><td>1 clean</td><td>All match</td><td><span class="pill mint">yes</span></td></tr>
+          <tr><td>2 short</td><td>Short, not ordered, not delivered</td><td><span class="pill mint">yes</span></td></tr>
+          <tr><td>3 messy</td><td>NEEDS_MANUAL. The PO number was unreadable, so the clerk assigns it</td><td><span class="pill mint">yes</span> no guessed PO now</td></tr>
+          <tr><td>4 over</td><td>Apples +20, others match despite KGS and CASES</td><td><span class="pill mint">yes</span></td></tr>
+          <tr><td>5 eggs</td><td>PO-4513, match</td><td><span class="pill mint">yes</span></td></tr>
+          <tr><td>6 wrong supplier</td><td>NEEDS_MANUAL, caught by the supplier check</td><td><span class="pill mint">yes</span></td></tr>
+          <tr><td>7 no PO</td><td>NEEDS_MANUAL</td><td><span class="pill mint">yes</span></td></tr>
+          <tr><td>8 crossed out</td><td>Read 78, not the struck-out 80, and said so in the note</td><td><span class="pill peach">right, but not flagged</span> confidence 0.9</td></tr>
+          <tr><td>9 cafe receipt</td><td>NEEDS_MANUAL, called it a cafe receipt</td><td><span class="pill mint">yes</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px">The model still reports high confidence on most lines, including handwriting. The supplier check and the PO lookup do the real safety work, so confidence is a weak signal with this model.</p>
   </section>
 
   <section class="slide" data-title="Swagger API docs">
@@ -960,7 +982,7 @@ flowchart LR
       </div>
       <div class="glass">
         <h3>Not yet verified</h3>
-        <p>The real vision call has run on all nine kit notes, each in 2 to 6 seconds. Note 3 was read with a guessed digit and not flagged. Still open: the airplane-mode demo on a device, and the app's emulator run.</p>
+        <p>The real vision call has run on all nine kit notes. Note 3 now goes to manual entry instead of a guessed PO, and the measured run at 100,004 POs passed. Still open: the airplane-mode demo on a device, and the app's emulator run.</p>
         <div style="margin-top:12px"><span class="pill peach">airplane demo</span><span class="pill peach">emulator run</span></div>
       </div>
       <div class="glass">
