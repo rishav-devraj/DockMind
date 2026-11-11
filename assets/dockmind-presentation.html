@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DockMind Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ---------- Theme tokens (pastel, light) ---------- */
+  :root {
+    --ink: #2f2a4a;
+    --ink-soft: #5d5778;
+    --ink-faint: #8c86a6;
+    --lavender: #c9b8f5;
+    --lavender-deep: #7c63c9;
+    --mint: #b5ecd6;
+    --mint-deep: #2f8f70;
+    --peach: #ffd3b6;
+    --peach-deep: #c0672f;
+    --sky: #bfe3fb;
+    --sky-deep: #2f74a8;
+    --rose: #ffc4d6;
+    --rose-deep: #b8436b;
+    --butter: #ffecb0;
+    --butter-deep: #9a7410;
+    --glass: rgba(255, 255, 255, 0.38);
+    --glass-strong: rgba(255, 255, 255, 0.58);
+    --glass-edge: rgba(255, 255, 255, 0.75);
+    --shadow: 0 10px 40px rgba(110, 90, 160, 0.18);
+    --radius: 26px;
+    --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #2f2a4a;
+    }
+  }
+  :root[data-theme="dark"] { --ink: #2f2a4a; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 12% 18%, #e7dcff 0, transparent 42%),
+      radial-gradient(circle at 88% 12%, #d4f4ea 0, transparent 40%),
+      radial-gradient(circle at 80% 88%, #ffe0cc 0, transparent 42%),
+      radial-gradient(circle at 18% 90%, #cfe9fc 0, transparent 40%),
+      linear-gradient(135deg, #f6f1ff 0%, #fdf4fa 50%, #effaf6 100%);
+    background-attachment: fixed;
+    overflow: hidden;
+  }
+  /* floating pastel orbs behind the glass */
+  .orb { position: fixed; border-radius: 50%; filter: blur(60px); opacity: .55; pointer-events: none; z-index: 0; animation: drift 22s ease-in-out infinite alternate; }
+  .orb.a { width: 340px; height: 340px; background: #d9c9ff; top: -80px; left: -60px; }
+  .orb.b { width: 300px; height: 300px; background: #b9f0dc; bottom: -90px; right: -40px; animation-delay: -6s; }
+  .orb.c { width: 220px; height: 220px; background: #ffd0b8; top: 40%; right: 30%; animation-delay: -12s; }
+  @keyframes drift { to { transform: translate(40px, -30px) scale(1.08); } }
+
+  /* ---------- Deck shell ---------- */
+  .deck { position: relative; z-index: 1; height: 100%; }
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 56px clamp(28px, 6vw, 96px) 96px;
+    opacity: 0; transform: translateX(40px) scale(.985);
+    pointer-events: none;
+    transition: opacity .55s ease, transform .55s cubic-bezier(.2,.7,.2,1);
+    overflow-y: auto;
+  }
+  .slide.active { opacity: 1; transform: none; pointer-events: auto; }
+  .slide.past { transform: translateX(-40px) scale(.985); }
+
+  .chapter-tag {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--lavender-deep); margin-bottom: 14px;
+  }
+  .chapter-tag::before { content: ""; width: 26px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--lavender-deep), var(--mint-deep)); }
+  h1 { font-size: clamp(40px, 6.4vw, 84px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.02; }
+  h2 { font-size: clamp(30px, 4.2vw, 52px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; margin-bottom: 18px; }
+  h3 { font-size: 19px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.01em; }
+  p, li { font-size: clamp(15px, 1.5vw, 18px); line-height: 1.6; color: var(--ink-soft); }
+  .lead { font-size: clamp(17px, 1.9vw, 22px); color: var(--ink-soft); max-width: 62ch; margin-bottom: 26px; }
+  .muted { color: var(--ink-faint); }
+  .grad {
+    background: linear-gradient(100deg, var(--lavender-deep), var(--sky-deep) 45%, var(--mint-deep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  code, .mono { font-family: var(--mono); font-size: .86em; background: rgba(255,255,255,.7); border: 1px solid rgba(124,99,201,.18); padding: 1px 7px; border-radius: 8px; color: var(--lavender-deep); }
+
+  /* ---------- Glass primitives ---------- */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.8);
+    padding: 26px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .glass.strong { background: var(--glass-strong); }
+  .glass::after { /* soft sheen */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(135deg, rgba(255,255,255,.45), transparent 38%);
+    border-radius: inherit;
+  }
+  .glass > * { position: relative; z-index: 1; }
+
+  .grid { display: grid; gap: 18px; }
+  .g2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .g4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .g5 { grid-template-columns: repeat(5, minmax(0,1fr)); }
+  @media (max-width: 900px) { .g3, .g4, .g5 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  @media (max-width: 620px) { .g2, .g3, .g4, .g5 { grid-template-columns: 1fr; } }
+
+  .icon {
+    width: 46px; height: 46px; border-radius: 16px;
+    display: grid; place-items: center; font-size: 22px; margin-bottom: 14px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+  }
+  .c-lav { background: var(--lavender); } .c-mint { background: var(--mint); }
+  .c-peach { background: var(--peach); } .c-sky { background: var(--sky); }
+  .c-rose { background: var(--rose); } .c-butter { background: #ffe9a3; }
+
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+    padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.9);
+    background: rgba(255,255,255,.55); color: var(--ink-soft); margin: 3px 4px 3px 0;
+  }
+  .pill.lav { background: #e8ddff; color: var(--lavender-deep); }
+  .pill.mint { background: #d3f6e7; color: var(--mint-deep); }
+  .pill.peach { background: #ffe3d0; color: var(--peach-deep); }
+  .pill.sky { background: #d8eefc; color: var(--sky-deep); }
+  .pill.rose { background: #ffdbe6; color: var(--rose-deep); }
+  .pill.butter { background: #fff1c2; color: var(--butter-deep); }
+
+  /* ---------- Flow / state diagrams ---------- */
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0; }
+  .node {
+    padding: 14px 18px; border-radius: 18px; min-width: 150px; text-align: center;
+    background: var(--glass-strong); border: 1px solid var(--glass-edge);
+    box-shadow: 0 6px 22px rgba(110,90,160,.12);
+    font-weight: 700; font-size: 15px; color: var(--ink);
+  }
+  .node small { display: block; font-weight: 500; font-size: 12px; color: var(--ink-faint); margin-top: 3px; font-family: var(--mono); }
+  .arrow { font-size: 22px; color: var(--lavender-deep); font-weight: 700; }
+  .arrow.down { transform: rotate(90deg); }
+  .node.lav { background: linear-gradient(160deg, #efe7ff, #ffffff80); }
+  .node.mint { background: linear-gradient(160deg, #dcf8ec, #ffffff80); }
+  .node.peach { background: linear-gradient(160deg, #ffe6d6, #ffffff80); }
+  .node.sky { background: linear-gradient(160deg, #daf0fd, #ffffff80); }
+  .node.rose { background: linear-gradient(160deg, #ffe0ea, #ffffff80); }
+  .node.butter { background: linear-gradient(160deg, #fff4cc, #ffffff80); }
+
+  .boundary {
+    border: 2px dashed rgba(124,99,201,.35); border-radius: 30px; padding: 22px; position: relative; margin: 10px 0;
+  }
+  .boundary > .label {
+    position: absolute; top: -13px; left: 22px; background: #fbf7ff; font-family: var(--mono); font-size: 11px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--lavender-deep); padding: 2px 10px; border-radius: 999px;
+  }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: clamp(13px, 1.3vw, 15.5px); }
+  th { text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 12px; border-bottom: 1px solid rgba(124,99,201,.2); font-weight: 500; }
+  td { padding: 10px 12px; color: var(--ink-soft); border-bottom: 1px solid rgba(124,99,201,.1); vertical-align: top; }
+  td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+
+  .steps { list-style: none; display: grid; gap: 12px; counter-reset: s; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 38px 1fr; gap: 14px; align-items: start; }
+  .steps li::before {
+    content: counter(s); width: 38px; height: 38px; border-radius: 14px; display: grid; place-items: center;
+    font-weight: 800; color: var(--ink); background: linear-gradient(145deg, #e4d8ff, #c8f1e0);
+    box-shadow: inset 0 1px 0 #fff, 0 4px 12px rgba(110,90,160,.15); font-size: 15px;
+  }
+  .steps li p { margin: 0; padding-top: 7px; }
+  .steps li b { color: var(--ink); }
+
+  pre.code {
+    font-family: var(--mono); font-size: clamp(12px, 1.2vw, 14px); line-height: 1.7;
+    background: rgba(47,42,74,.92); color: #e9e4ff; padding: 20px 22px; border-radius: 20px; overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+  pre.code .k { color: #ffb8d8; } pre.code .s { color: #b5ecd6; } pre.code .c { color: #8c86b0; }
+
+  .stat { font-size: clamp(34px, 4.4vw, 56px); font-weight: 800; letter-spacing: -0.03em; }
+  .split { display: grid; grid-template-columns: 1.05fr .95fr; gap: 36px; align-items: center; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+
+  /* ---------- Chapter cover ---------- */
+  .cover .num { font-family: var(--mono); font-size: clamp(90px, 16vw, 200px); font-weight: 500; line-height: .9; letter-spacing: -.05em; opacity: .9; }
+
+  /* ---------- Navigation ---------- */
+  .hud {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px clamp(16px, 4vw, 40px);
+  }
+  .hud .glass { padding: 10px 14px; border-radius: 999px; display: flex; align-items: center; gap: 10px; }
+  .btn {
+    font: inherit; font-weight: 700; font-size: 14px; color: var(--ink); cursor: pointer;
+    background: rgba(255,255,255,.7); border: 1px solid #fff; border-radius: 999px; padding: 9px 18px;
+    box-shadow: 0 4px 14px rgba(110,90,160,.14); transition: transform .15s ease, background .2s;
+  }
+  .btn:hover { transform: translateY(-1px); background: #fff; }
+  .btn:disabled { opacity: .4; cursor: default; transform: none; }
+  .counter { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); min-width: 64px; text-align: center; }
+  .progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: rgba(255,255,255,.5); }
+  .progress > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--lavender-deep), var(--sky-deep), var(--mint-deep)); transition: width .45s ease; border-radius: 0 3px 3px 0; }
+  .hint { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+  @media (max-width: 620px) { .hint { display: none; } .hud .glass { padding: 6px 8px; } }
+
+  .slide ::-webkit-scrollbar { width: 0; }
+  @media (max-width: 620px) {
+    .slide { padding: 40px 18px 110px; }
+    .glass { padding: 20px; }
+    table { font-size: 13px; }
+    td, th { padding: 8px 6px; }
+  }
+  .mermaid { background: rgba(255,255,255,.55); border: 1px solid #fff; border-radius: 18px; padding: 14px; overflow-x: auto; color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.5; text-align: center; min-height: 220px; }
+  .mermaid svg { max-width: 100%; height: auto; }
+  .offline-grid { display: grid; grid-template-columns: .9fr 1.3fr; gap: 18px; align-items: stretch; }
+  @media (max-width: 760px) { .offline-grid { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) {
+    .orb, .slide { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+
+<main class="deck" id="deck">
+
+  <!-- 01 TITLE -->
+  <section class="slide active" data-title="Title">
+    <div class="chapter-tag">DockMind · Architecture walkthrough</div>
+    <h1>AI Dock <span class="grad">Receiver</span></h1>
+    <p class="lead" style="margin-top:22px">How a clerk's photo of a delivery note becomes a verified receipt. High-level design first, then the low-level design of the mobile app and the backend.</p>
+    <div style="margin-top:26px">
+      <span class="pill lav">React Native · Expo</span>
+      <span class="pill mint">Spring Boot 3 · Java 17</span>
+      <span class="pill peach">Gemini vision</span>
+      <span class="pill sky">H2 file database</span>
+    </div>
+  </section>
+
+  <!-- 02 AGENDA -->
+  <section class="slide" data-title="Agenda">
+    <div class="chapter-tag">Agenda</div>
+    <h2>Five chapters</h2>
+    <div class="grid g3" style="margin-top:12px">
+      <div class="glass"><div class="icon c-lav">01</div><h3>The problem and the loop</h3><p>Why this exists and what the product does in one pass.</p></div>
+      <div class="glass"><div class="icon c-sky">02</div><h3>High-level design</h3><p>Context, containers, lifecycle, and the end-to-end flow.</p></div>
+      <div class="glass"><div class="icon c-mint">03</div><h3>Low-level design: app</h3><p>Modules, the offline queue, the review and decision logic.</p></div>
+      <div class="glass"><div class="icon c-peach">04</div><h3>Low-level design: backend</h3><p>Capture, extraction, validation, matching, data model, API.</p></div>
+      <div class="glass"><div class="icon c-rose">05</div><h3>Walkthrough</h3><p>One receipt from shutter tap to database row, failure modes, and what is next.</p></div>
+    </div>
+  </section>
+
+  <!-- ===== CHAPTER 01 ===== -->
+  <section class="slide cover" data-title="Chapter 1">
+    <div class="num">01</div>
+    <div class="chapter-tag" style="margin-top:12px">Chapter</div>
+    <h2>The problem and the loop</h2>
+    <p class="lead">Trucks arrive, drivers hand over paper, and shortages surface days later when the invoice arrives.</p>
+  </section>
+
+  <section class="slide" data-title="The problem">
+    <div class="chapter-tag">01 · Context</div>
+    <h2>Prove what came off the truck, <span class="grad">before it leaves</span></h2>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="glass"><div class="icon c-rose">📄</div><h3>Paper at the dock</h3><p>The driver hands over a delivery note. The clerk checks it against the purchase order by eye.</p></div>
+      <div class="glass"><div class="icon c-butter">🕰️</div><h3>Found too late</h3><p>Clipboard numbers get typed into a desktop system later. Shortages show up when the invoice arrives.</p></div>
+      <div class="glass"><div class="icon c-sky">📶</div><h3>Poor signal</h3><p>The dock often has no network. Capture must still work, and nothing can be lost or duplicated.</p></div>
+      <div class="glass"><div class="icon c-mint">✅</div><h3>Scope of this sprint</h3><p>One loop, no login, one hard-coded clerk: <code>clerk-01</code>. No invoicing and no supplier portal.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="The loop">
+    <div class="chapter-tag">01 · The product loop</div>
+    <h2>Capture, read, compare, decide</h2>
+    <div class="flow" style="margin-top:28px">
+      <div class="node lav">1 · Capture<small>photo on the phone</small></div><div class="arrow">→</div>
+      <div class="node sky">2 · Read<small>vision model</small></div><div class="arrow">→</div>
+      <div class="node mint">3 · Compare<small>plain code</small></div><div class="arrow">→</div>
+      <div class="node peach">4 · Decide<small>confirm or dispute</small></div>
+    </div>
+    <div class="glass strong" style="margin-top:22px">
+      <h3>The rule that shapes everything</h3>
+      <p style="font-size:clamp(18px,2vw,24px);color:var(--ink);font-weight:600;margin-top:6px">The AI reads and explains. Our code decides.</p>
+      <p style="margin-top:10px">A discrepancy can start a dispute with a supplier, so it has to be repeatable and testable. A model is neither.</p>
+    </div>
+  </section>
+
+  <!-- ===== CHAPTER 02 HLD ===== -->
+  <section class="slide cover" data-title="Chapter 2">
+    <div class="num">02</div>
+    <div class="chapter-tag" style="margin-top:12px">Chapter</div>
+    <h2>High-level design</h2>
+    <p class="lead">The big boxes, who talks to whom, the receipt lifecycle, and the guarantees the design makes.</p>
+  </section>
+
+  <section class="slide" data-title="System context">
+    <div class="chapter-tag">02 · HLD · System context</div>
+    <h2>Four parties, one API</h2>
+    <div class="boundary" style="margin-top:22px">
+      <span class="label">DockMind system</span>
+      <div class="flow" style="margin:6px 0 0;justify-content:center">
+        <div class="node lav">Clerk<small>on the dock floor</small></div>
+        <div class="arrow">⇄</div>
+        <div class="node sky">Mobile app<small>Expo · RN · SQLite queue</small></div>
+        <div class="arrow">⇄ HTTPS</div>
+        <div class="node mint">Spring Boot API<small>REST · port 8080</small></div>
+        <div class="arrow">⇄</div>
+        <div class="node butter">H2 file DB<small>POs · receipts · photos</small></div>
+      </div>
+    </div>
+    <div class="flow" style="justify-content:center;margin-top:8px">
+      <div class="arrow">↕ photo + prompt</div>
+      <div class="node rose" style="min-width:220px">Gemini vision API<small>external · LLM_MODEL</small></div>
+    </div>
+    <div class="grid g2" style="margin-top:20px">
+      <div class="glass"><h3>Who uses it</h3><p>One receiving clerk, on a phone, sometimes with no signal. The seed POs are the only source of truth for what was ordered.</p></div>
+      <div class="glass"><h3>What it does not do</h3><p>No login, no payments, no supplier portal. The API has no authentication, so a hosted URL should stay private.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Containers">
+    <div class="chapter-tag">02 · HLD · Containers</div>
+    <h2>Each part owns one job</h2>
+    <div class="grid g2" style="margin-top:10px">
+      <div class="glass"><div class="icon c-sky">📱</div><h3>Mobile app</h3><p>Captures photos, owns the offline upload queue, shows the review screen, and sends corrections and decisions. It holds no discrepancy logic.</p><div style="margin-top:10px"><span class="pill sky">capture</span><span class="pill sky">queue</span><span class="pill sky">review</span></div></div>
+      <div class="glass"><div class="icon c-mint">⚙️</div><h3>Backend API</h3><p>Stores receipts and POs, runs the lifecycle, validates every model answer, and computes discrepancies. The single writer of the database.</p><div style="margin-top:10px"><span class="pill mint">REST</span><span class="pill mint">lifecycle</span><span class="pill mint">matching</span></div></div>
+      <div class="glass"><div class="icon c-lav">🧠</div><h3>AI reader</h3><p>Behind an <code>Extractor</code> interface. <code>LlmExtractor</code> calls the vision model, <code>FixtureExtractor</code> returns canned JSON. Both feed the same validator.</p><div style="margin-top:10px"><span class="pill lav">swappable</span><span class="pill lav">untrusted output</span></div></div>
+      <div class="glass"><div class="icon c-butter">🗄️</div><h3>Storage</h3><p>H2 in file mode under <code>DOCKMIND_DATA</code>. The photo is stored in its own table, so a receipt and its proof of delivery commit in one transaction.</p><div style="margin-top:10px"><span class="pill butter">H2 file</span><span class="pill butter">SQLite on phone</span></div></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Lifecycle">
+    <div class="chapter-tag">02 · HLD · Receipt lifecycle</div>
+    <h2>One state machine, two terminal states</h2>
+    <div class="flow" style="margin-top:24px">
+      <div class="node lav">CAPTURED<small>photo saved, reading</small></div><div class="arrow">→</div>
+      <div class="node mint">EXTRACTED<small>read and PO resolved</small></div><div class="arrow">→</div>
+      <div class="node butter" style="min-width:200px">CONFIRMED<small>terminal</small></div>
+    </div>
+    <div class="flow" style="margin-top:0">
+      <div style="width:170px"></div>
+      <div class="arrow down">↳</div>
+      <div class="node peach" style="margin-left:10px">NEEDS_MANUAL<small>read failed or PO unresolved</small></div><div class="arrow">→</div>
+      <div class="node rose" style="min-width:200px">DISPUTED<small>terminal, with reason</small></div>
+    </div>
+    <div class="grid g2" style="margin-top:22px">
+      <div class="glass"><h3>Only the clerk moves a receipt forward</h3><p>A <b>NEEDS_MANUAL</b> receipt can be corrected, given a PO, or disputed. It cannot be confirmed until a PO is assigned.</p></div>
+      <div class="glass"><h3>Never a 500, never a dropped receipt</h3><p>Model failure or garbage output lands in <b>NEEDS_MANUAL</b> with the photo kept. <code>poNumber</code> is always null in that state.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Guarantees">
+    <div class="chapter-tag">02 · HLD · Guarantees</div>
+    <h2>Three promises the design keeps</h2>
+    <div class="grid g3" style="margin-top:10px">
+      <div class="glass"><div class="icon c-lav">🔁</div><h3>Idempotent capture</h3><p>The phone makes one <code>Idempotency-Key</code> at capture time and reuses it on every retry, even after a kill. The server has a unique constraint on that key.</p></div>
+      <div class="glass"><div class="icon c-sky">📴</div><h3>Offline tolerant</h3><p>Every capture goes through the local queue first, online or not. The queue drains in order when the network returns.</p></div>
+      <div class="glass"><div class="icon c-mint">🧮</div><h3>Deterministic decisions</h3><p>Discrepancies come from one pure matcher. The model never does arithmetic and never decides a discrepancy.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="End-to-end flow">
+    <div class="chapter-tag">02 · HLD · End to end</div>
+    <h2>From shutter tap to a decision</h2>
+    <ol class="steps" style="margin-top:12px">
+      <li><p><b>Phone</b> copies the photo to app storage, makes the key, writes a SQLite row as <code>WAITING</code>. This happens before any network call.</p></li>
+      <li><p><b>Queue</b> uploads the head item (A4) with its key. The server answers <code>202</code> with the receipt as <code>CAPTURED</code>.</p></li>
+      <li><p><b>Server</b> saves the receipt and photo in one transaction, then reads the note on a background thread.</p></li>
+      <li><p><b>Reader</b> returns JSON. The validator cleans it, checks the PO and supplier, and clamps confidence. The result is saved as <code>EXTRACTED</code> or <code>NEEDS_MANUAL</code>.</p></li>
+      <li><p><b>Phone</b> polls A3 and shows the lines, the discrepancy chips and the <code>aiNote</code>.</p></li>
+      <li><p><b>Clerk</b> corrects quantities (A5) or assigns a PO (A8), ticks flagged lines, then confirms (A6) or disputes with a reason (A7).</p></li>
+    </ol>
+  </section>
+
+  <!-- ===== CHAPTER 03 LLD APP ===== -->
+  <section class="slide cover" data-title="Chapter 3">
+    <div class="num">03</div>
+    <div class="chapter-tag" style="margin-top:12px">Chapter</div>
+    <h2>Low-level design: the mobile app</h2>
+    <p class="lead">Module boundaries, the offline queue state machine, and where the review rules live.</p>
+  </section>
+
+  <section class="slide" data-title="App modules">
+    <div class="chapter-tag">03 · LLD · App structure</div>
+    <h2>Routes on the outside, pure logic in the middle</h2>
+    <div class="grid g3" style="margin-top:10px">
+      <div class="glass"><h3><code>src/app/</code> screens</h3><p>Expo Router pages: <b>index</b> (open POs), <b>capture</b>, <b>queue</b>, <b>receipts</b>, <b>review</b>. Screens never call <code>fetch</code>.</p></div>
+      <div class="glass"><h3><code>src/capture/</code></h3><p><code>photo.ts</code> takes or picks an image. <code>saveCapture.ts</code> copies it, makes the key, and writes the queue row.</p></div>
+      <div class="glass"><h3><code>src/queue/</code></h3><p><code>queue.ts</code> is pure logic with injected store and uploader. <code>sqliteStore.ts</code> is persistence. <code>runtime.ts</code> wires it to the network and app state.</p></div>
+      <div class="glass"><h3><code>src/api/</code></h3><p><code>client.ts</code> exposes one <code>ApiClient</code>. <code>http.ts</code> is the implementation. <code>types.ts</code> mirrors CONTRACT.md in one file.</p></div>
+      <div class="glass"><h3><code>src/review/</code></h3><p><code>decision.ts</code> holds the confirm rules. <code>useReceipt</code> polls, <code>useAction</code> runs writes. Panels render lines and checks.</p></div>
+      <div class="glass"><h3><code>src/lib/</code></h3><p><code>db.ts</code> opens SQLite. <code>network.ts</code> tracks connectivity. <code>poCache.ts</code> keeps the last PO list for offline. <code>runtime.ts</code> builds the API client.</p></div>
+    </div>
+    <div style="margin-top:14px"><span class="pill lav">Expo SDK 58</span><span class="pill lav">React Native 0.88</span><span class="pill lav">expo-router</span><span class="pill lav">expo-sqlite</span><span class="pill lav">expo-image-manipulator</span><span class="pill lav">netinfo</span><span class="pill lav">TypeScript strict</span></div>
+  </section>
+
+  <section class="slide" data-title="Offline queue">
+    <div class="chapter-tag">03 · LLD · Offline queue</div>
+    <h2>Four states, one row per capture</h2>
+    <div class="flow" style="margin-top:22px">
+      <div class="node lav">WAITING<small>saved, not sent</small></div><div class="arrow">→</div>
+      <div class="node sky">UPLOADING<small>request in flight</small></div><div class="arrow">→</div>
+      <div class="node mint">SYNCED<small>has receiptId</small></div>
+    </div>
+    <div class="flow" style="margin-top:0;padding-left:250px">
+      <div class="arrow down">↳</div>
+      <div class="node rose" style="min-width:200px">FAILED<small>400 / 413, manual retry</small></div>
+    </div>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="glass">
+        <h3>Retry rules</h3>
+        <p>Network errors, 5xx and timeouts go back to <b>WAITING</b> with exponential backoff: 2 s, doubling, capped at 60 s. A 400 or 413 goes to <b>FAILED</b> with a plain reason and a retry button.</p>
+      </div>
+      <div class="glass">
+        <h3>Recovery and ordering</h3>
+        <p>On start, any row left in <b>UPLOADING</b> returns to <b>WAITING</b> with the same key. Uploads are strictly in order, one at a time, and a newer item never overtakes one that is backing off.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Drain loop">
+    <div class="chapter-tag">03 · LLD · Drain loop</div>
+    <h2>How the queue drains</h2>
+    <div class="split">
+      <div>
+        <ul class="steps">
+          <li><p><b>Single flight.</b> A drain call during a run sets a <code>rerun</code> flag. It does not start a second run.</p></li>
+          <li><p><b>Wake triggers.</b> Connectivity returns, the app comes to the foreground, or the clerk taps retry. Each wake clears backoff timers and drains.</p></li>
+          <li><p><b>Storage failure.</b> If SQLite throws, the queue logs it and retries after 60 s instead of stopping for good.</p></li>
+          <li><p><b>Key stays fixed.</b> Every attempt, including a manual retry, sends the same key, so the server returns the same receipt.</p></li>
+        </ul>
+      </div>
+      <div class="glass">
+        <h3>Upload attempt, simplified</h3>
+        <pre class="code"><span class="k">while</span> (isOnline()) {
+  head = <span class="k">first</span> WAITING item
+  <span class="k">if</span> (head.nextAttemptAt &gt; now) schedule(wait); <span class="k">return</span>
+  <span class="c">// mark UPLOADING, bump attempts, publish</span>
+  <span class="k">try</span> {
+    receiptId = <span class="k">await</span> upload(head)   <span class="c">// A4, same key</span>
+    store(SYNCED, receiptId)
+  } <span class="k">catch</span> (e) {
+    outcome = classify(e)
+    retry ? WAITING + backoff : FAILED
+  }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Offline queue diagrams">
+    <div class="chapter-tag">03 · LLD · Offline queue, as diagrams</div>
+    <h2>Capture offline, sync later, never twice</h2>
+    <div class="offline-grid" style="margin-top:6px">
+      <div class="glass">
+        <h3>Row lifecycle</h3>
+        <pre class="mermaid" data-diagram="states">
+stateDiagram-v2
+  [*] --> WAITING: captured
+  WAITING --> UPLOADING: online
+  UPLOADING --> SYNCED: 202
+  UPLOADING --> WAITING: retry
+  UPLOADING --> FAILED: 400 or 413
+  FAILED --> WAITING: manual retry
+  UPLOADING --> WAITING: app killed
+        </pre>
+      </div>
+      <div class="glass">
+        <h3>Airplane mode, then reconnect</h3>
+        <pre class="mermaid" data-diagram="sequence">
+sequenceDiagram
+  participant C as Clerk
+  participant Q as Queue (SQLite)
+  participant N as Network
+  participant S as Server
+  C->>Q: shutter tap, photo and key saved
+  Q-->>C: WAITING, waiting to sync
+  Note over N: no signal, nothing sent
+  N-->>Q: connectivity returns, wake
+  Q->>S: POST /receipts, same Idempotency-Key
+  S-->>Q: 202 with receiptId
+  Q-->>C: SYNCED
+        </pre>
+      </div>
+    </div>
+    <div class="glass" style="margin-top:16px"><p>Duplicates are impossible by construction: the key is written before the first upload, reused on every retry, and the server's unique constraint returns the existing receipt.</p></div>
+  </section>
+
+  <section class="slide" data-title="Review and decision">
+    <div class="chapter-tag">03 · LLD · Review and decide</div>
+    <h2>The app renders, the server decides</h2>
+    <div class="grid g2" style="margin-top:8px">
+      <div class="glass">
+        <h3>Reviewing a receipt</h3>
+        <p>After upload, the review screen polls A3. A slow read shows "Still reading the note, this can take 30 seconds". Each line shows ordered against received, a colored discrepancy chip, its confidence, and the <code>aiNote</code>.</p>
+        <p style="margin-top:8px">Corrections go through A5. The screen then shows the server's recalculated <code>discrepancy</code> and <code>delta</code>. The app has no discrepancy logic of its own.</p>
+      </div>
+      <div class="glass">
+        <h3>Confirm is gated in the client</h3>
+        <p><code>confirmBlocker()</code> returns the reason Confirm is off, in plain words:</p>
+        <ul style="margin:10px 0 0 18px;color:var(--ink-soft);line-height:1.8">
+          <li>Receipt not <code>EXTRACTED</code> or <code>NEEDS_MANUAL</code></li>
+          <li><code>poNumber</code> null: pick the PO first (A8)</li>
+          <li>Each flagged line not yet ticked</li>
+          <li>Flagged receipt with a PO: tick the PO too</li>
+        </ul>
+        <p style="margin-top:10px">The server still enforces every rule. The client check is about making the clerk look.</p>
+      </div>
+    </div>
+    <div class="glass" style="margin-top:18px"><h3>Dispute and repeats</h3><p>Dispute needs a non-blank reason, up to 2000 characters. Confirm and dispute are both safe to tap twice, so a double tap or a retry after a timeout cannot change the result.</p></div>
+  </section>
+
+  <section class="slide" data-title="API client">
+    <div class="chapter-tag">03 · LLD · Client to contract</div>
+    <h2>Every screen talks through one interface</h2>
+    <div class="split">
+      <div class="glass" style="padding:18px 20px">
+        <table>
+          <thead><tr><th>Call</th><th>Used by</th></tr></thead>
+          <tbody>
+            <tr><td>A1 list POs</td><td>PO list, PO cache</td></tr>
+            <tr><td>A2 list receipts</td><td>receipts list</td></tr>
+            <tr><td>A3 get receipt</td><td>review polling</td></tr>
+            <tr><td>A4 upload</td><td>queue drain only</td></tr>
+            <tr><td>A5 correct line</td><td>review, quantity edit</td></tr>
+            <tr><td>A6 confirm</td><td>decision panel</td></tr>
+            <tr><td>A7 dispute</td><td>decision panel</td></tr>
+            <tr><td>A8 assign PO</td><td>NEEDS_MANUAL review</td></tr>
+            <tr><td>A9 image</td><td>photo on review</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="glass" style="margin-bottom:16px">
+          <h3>One interface, two ways to plug it in</h3>
+          <p><code>ApiClient</code> is the only path to the server. Its base URL comes from <code>EXPO_PUBLIC_API_URL</code>. Changing the server is a config change, not a code change.</p>
+        </div>
+        <div class="glass">
+          <h3>Errors in plain words</h3>
+          <p>Every failure is <code>{ error, message }</code>. <code>errors.ts</code> separates <code>ApiError</code> (the server said no) from <code>NetworkError</code> (no answer), so screens can show the right message.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CHAPTER 04 LLD BACKEND ===== -->
+  <section class="slide cover" data-title="Chapter 4">
+    <div class="num">04</div>
+    <div class="chapter-tag" style="margin-top:12px">Chapter</div>
+    <h2>Low-level design: the backend</h2>
+    <p class="lead">Capture and idempotency, the extraction pipeline, deterministic matching, the data model, and the API.</p>
+  </section>
+
+  <section class="slide" data-title="Backend modules">
+    <div class="chapter-tag">04 · LLD · Backend structure</div>
+    <h2>Five packages, one direction of dependency</h2>
+    <div class="flow" style="margin-top:14px;justify-content:center">
+      <div class="node sky">api<small>controllers, error map</small></div><div class="arrow">→</div>
+      <div class="node mint">service<small>capture, runner, receipts</small></div><div class="arrow">→</div>
+      <div class="node lav">ai · matching<small>reader and pure matcher</small></div><div class="arrow">→</div>
+      <div class="node butter">domain<small>JPA entities, repos</small></div>
+    </div>
+    <div class="grid g2" style="margin-top:20px">
+      <div class="glass"><h3>Key classes</h3>
+        <p><code>CaptureService</code> handles A4 and idempotency. <code>ExtractionRunner</code> runs the reader off the request thread. <code>ReceiptService</code> holds the lifecycle and every clerk action. <code>Matcher</code> is pure, with no Spring and no database.</p></div>
+      <div class="glass"><h3>Why this shape</h3>
+        <p>The matcher can be unit tested in isolation, and the reader can be swapped without touching the lifecycle. The validator sits between them, so nothing unchecked reaches <code>ReceiptService</code>.</p></div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Capture path">
+    <div class="chapter-tag">04 · LLD · Capture (A4)</div>
+    <h2>Idempotent capture in five checks</h2>
+    <div class="split">
+      <ol class="steps">
+        <li><p><b>Key.</b> Trim the <code>Idempotency-Key</code>. It must be 1 to 255 characters, or 400.</p></li>
+        <li><p><b>Bytes, not headers.</b> Sniff JPEG or PNG magic bytes. A declared type proves nothing.</p></li>
+        <li><p><b>Replay.</b> Look up the key. If found, return the existing receipt with 200.</p></li>
+        <li><p><b>Create.</b> Save the receipt and image in one transaction. Flush right away so a duplicate key shows up here.</p></li>
+        <li><p><b>Race.</b> If the unique key is lost to a concurrent request, catch the error and return the winner's receipt.</p></li>
+      </ol>
+      <div class="glass">
+        <h3>Why it's safe</h3>
+        <p>The unique constraint is the real guard. The lookup is a fast path. Two identical requests at the same moment can't both create a receipt.</p>
+        <p style="margin-top:10px">After creation, <code>ExtractionRunner.submit()</code> starts the read and the controller returns <b>202</b> with <code>lines: []</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Extraction pipeline">
+    <div class="chapter-tag">04 · LLD · Extraction pipeline</div>
+    <h2>Read, validate, then save</h2>
+    <div class="flow" style="margin-top:20px">
+      <div class="node peach">ExtractionRunner<small>executor thread</small></div><div class="arrow">→</div>
+      <div class="node lav">Extractor<small>Llm or Fixture</small></div><div class="arrow">→</div>
+      <div class="node mint">ExtractionValidator<small>one path for all output</small></div><div class="arrow">→</div>
+      <div class="node sky">applyExtraction<small>row lock, CAPTURED only</small></div>
+    </div>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="glass">
+        <h3>Validator rules</h3>
+        <ul style="margin-left:18px;color:var(--ink-soft);line-height:1.8">
+          <li>Strip markdown fences and any text around the JSON</li>
+          <li>Coerce strings to numbers, including <code>"1,072.5 kg"</code></li>
+          <li>Clamp confidence to 0..1; <code>"95%"</code> reads as 0.95; missing counts as 0</li>
+          <li>Resolve the PO only if the supplier also agrees</li>
+          <li>Clear any <code>poLineId</code> that is unknown or on another PO</li>
+        </ul>
+      </div>
+      <div class="glass">
+        <h3>Failure paths all end in NEEDS_MANUAL</h3>
+        <ul style="margin-left:18px;color:var(--ink-soft);line-height:1.8">
+          <li>Timeout, HTTP error, or exception in the reader</li>
+          <li>Unusable output, or a note with no lines</li>
+          <li>A line with an unreadable, negative or huge quantity</li>
+        </ul>
+        <p style="margin-top:10px"><code>applyExtraction</code> returns early unless the receipt is still <code>CAPTURED</code>, so a re-run can't overwrite later clerk work.</p>
+      </div>
+    </div>
+    <div class="glass" style="margin-top:18px"><h3>Recovery</h3><p>On startup, every receipt still <code>CAPTURED</code> is read again. A crash between capture and extraction loses nothing.</p></div>
+  </section>
+
+  <section class="slide" data-title="Matching rules">
+    <div class="chapter-tag">04 · LLD · Matching</div>
+    <h2>Four rules, applied in order, per line</h2>
+    <div class="split">
+      <div class="glass" style="padding:18px 20px">
+        <table>
+          <thead><tr><th>#</th><th>Condition</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>No PO line linked</td><td><span class="pill rose">UNKNOWN_ITEM</span> delta null</td></tr>
+            <tr><td>2</td><td>Linked, unit differs</td><td><span class="pill peach">UNIT_MISMATCH</span> delta null</td></tr>
+            <tr><td>3</td><td>Received equals 0</td><td><span class="pill butter">NOT_DELIVERED</span> delta = −ordered</td></tr>
+            <tr><td>4</td><td>Received vs ordered</td><td><span class="pill sky">SHORT</span> <span class="pill mint">MATCH</span> <span class="pill lav">OVER</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="glass" style="margin-bottom:16px">
+          <h3>Before the rules</h3>
+          <p>Units are normalized first: <code>KGS</code> and <code>kg</code> become <code>KG</code>, <code>CASES</code> becomes <code>CASE</code>, <code>EACH</code> and <code>PCS</code> become <code>EA</code>. Descriptions are compared in lower case with punctuation removed.</p>
+        </div>
+        <div class="glass">
+          <h3>Linking and missing lines</h3>
+          <p>Lines link by exact description first, then by a shortened name when only one PO line fits. Every PO line absent from the note is added as <code>NOT_DELIVERED</code>, by code.</p>
+          <p style="margin-top:8px"><b>needsReview</b>: confidence below 0.80 and not corrected by the clerk.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="PO resolution">
+    <div class="chapter-tag">04 · LLD · PO resolution and clerk actions</div>
+    <h2>A PO number alone is not enough</h2>
+    <div class="grid g2" style="margin-top:10px">
+      <div class="glass">
+        <h3>The cross-check</h3>
+        <p>A PO is resolved only when <code>poNumber</code> exists <b>and</b> the note's supplier matches that PO's supplier. Matching ignores case, punctuation, and suffixes such as <i>Ltd</i>, <i>Co</i> and <i>Inc</i>.</p>
+        <p style="margin-top:10px"><span class="pill rose">PO-4503</span> and <span class="pill rose">PO-4513</span> differ by one digit. The supplier check is what separates them.</p>
+        <p style="margin-top:10px">On a mismatch, <code>poNumber</code> is null, every link is cleared, and the receipt goes to <b>NEEDS_MANUAL</b>.</p>
+      </div>
+      <div class="glass">
+        <h3>What the clerk can change</h3>
+        <table>
+          <thead><tr><th>Action</th><th>Rule</th></tr></thead>
+          <tbody>
+            <tr><td>A5 correct</td><td>Clerk's quantity wins; keeps <code>aiQty</code>; recomputes</td></tr>
+            <tr><td>A8 assign PO</td><td>Only when unresolved; sets confidence to 1.0; a different PO returns 409</td></tr>
+            <tr><td>A6 confirm</td><td>Needs a resolved PO; repeat returns 200</td></tr>
+            <tr><td>A7 dispute</td><td>Non-blank reason; repeat keeps the first reason</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="glass" style="margin-top:16px"><h3>Concurrency</h3><p>Every clerk action and every extraction write reads the receipt with a <span class="pill lav">PESSIMISTIC_WRITE</span> lock. A simultaneous confirm and dispute cannot both succeed.</p></div>
+  </section>
+
+  <section class="slide" data-title="Data model">
+    <div class="chapter-tag">04 · LLD · Data model</div>
+    <h2>Five tables, one photo per receipt</h2>
+    <div class="grid g2" style="margin-top:6px">
+      <div class="glass">
+        <pre class="code"><span class="k">purchase_orders</span>  id · po_number · supplier · status
+   └─ <span class="k">po_lines</span>  id · po_id · sku · description
+                  ordered_qty · unit
+
+<span class="k">receipts</span>  id · status · idempotency_key <span class="c">UNIQUE</span>
+                po_number · supplier · delivery_note_no
+                ai_note · overall_confidence · po_confidence
+                dispute_reason · clerk · created_at
+   ├─ <span class="k">receipt_lines</span>  id · po_line_id ?
+   │      description · ai_qty · received_qty
+   │      unit · confidence · discrepancy · delta
+   │      corrected_by_clerk · needs_review
+   └─ <span class="k">receipt_images</span>  receipt_id · data · mime_type</pre>
+      </div>
+      <div class="glass">
+        <h3>Design notes</h3>
+        <ul style="margin-left:18px;color:var(--ink-soft);line-height:1.8">
+          <li><b>Two quantities per line.</b> <code>ai_qty</code> keeps what the model read. <code>received_qty</code> is the clerk's number once corrected.</li>
+          <li><b>Idempotency key</b> is unique, so the database enforces replay safety.</li>
+          <li><b>Photo</b> sits in its own table, in the same transaction as the receipt.</li>
+          <li><b>Lines link to PO lines</b> only through <code>po_line_id</code>, which is cleared when invalid.</li>
+          <li><b>Confirming a receipt</b> does not close its PO, since a PO can arrive in several deliveries.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="API and errors">
+    <div class="chapter-tag">04 · LLD · API surface</div>
+    <h2>Nine endpoints, one error shape</h2>
+    <div class="split">
+      <div class="glass" style="padding:16px 18px">
+        <table>
+          <thead><tr><th>#</th><th>Route</th><th>Success</th></tr></thead>
+          <tbody>
+            <tr><td>A1</td><td>GET /purchase-orders?status=OPEN</td><td>200</td></tr>
+            <tr><td>A2</td><td>GET /receipts?status=</td><td>200</td></tr>
+            <tr><td>A3</td><td>GET /receipts/{id}</td><td>200</td></tr>
+            <tr><td>A4</td><td>POST /receipts</td><td>202 new · 200 replay</td></tr>
+            <tr><td>A5</td><td>PATCH /receipts/{id}/lines/{lineId}</td><td>200</td></tr>
+            <tr><td>A6</td><td>POST /receipts/{id}/confirm</td><td>200</td></tr>
+            <tr><td>A7</td><td>POST /receipts/{id}/dispute</td><td>200</td></tr>
+            <tr><td>A8</td><td>PATCH /receipts/{id}</td><td>200</td></tr>
+            <tr><td>A9</td><td>GET /receipts/{id}/image</td><td>200</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <pre class="code">{ <span class="s">"error"</span>: <span class="s">"RECEIPT_CLOSED"</span>,
+  <span class="s">"message"</span>: <span class="s">"This receipt is already confirmed."</span> }</pre>
+        <div class="glass" style="margin-top:16px">
+          <h3>Status codes</h3>
+          <p><b>400</b> bad input · <b>404</b> unknown receipt, line or PO · <b>409</b> wrong state · <b>413</b> photo too large.</p>
+          <p style="margin-top:8px">Added beyond the brief, and documented in CONTRACT.md: A8 and A9, plus <code>GET /health</code>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Configuration">
+    <div class="chapter-tag">04 · LLD · Configuration</div>
+    <h2>Everything swappable is config</h2>
+    <div class="grid g2" style="margin-top:8px">
+      <div class="glass" style="padding:16px 18px">
+        <table>
+          <thead><tr><th>Variable</th><th>Default · purpose</th></tr></thead>
+          <tbody>
+            <tr><td>EXTRACTOR_TYPE</td><td>fixture · or <code>llm</code></td></tr>
+            <tr><td>LLM_API_KEY</td><td>none · Gemini key, read from env or <code>.env</code></td></tr>
+            <tr><td>LLM_MODEL</td><td>gemini-2.5-flash · any vision model</td></tr>
+            <tr><td>PORT</td><td>8080 · set by the host</td></tr>
+            <tr><td>DOCKMIND_DATA</td><td>./data · H2 folder</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="glass">
+        <h3>Principles</h3>
+        <ul style="margin-left:18px;color:var(--ink-soft);line-height:1.9">
+          <li>Keys live in the environment, never in the image or the repository.</li>
+          <li>Fixture mode runs the whole app with no network, which the demo fallback relies on.</li>
+          <li>Both extractors feed the same validator, so the lifecycle does not change when the model does.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CHAPTER 05 WALKTHROUGH ===== -->
+  <section class="slide cover" data-title="Chapter 5">
+    <div class="num">05</div>
+    <div class="chapter-tag" style="margin-top:12px">Chapter</div>
+    <h2>Walkthrough</h2>
+    <p class="lead">One receipt, end to end, then what happens when things go wrong.</p>
+  </section>
+
+  <section class="slide" data-title="One receipt">
+    <div class="chapter-tag">05 · Trace one receipt</div>
+    <h2>Shutter tap to database row</h2>
+    <div class="grid g4" style="margin-top:12px">
+      <div class="glass"><div class="icon c-lav">📸</div><h3>Phone</h3><p>Photo downscaled to about 1600 px and compressed. Key made. Row written as <code>WAITING</code>.</p></div>
+      <div class="glass"><div class="icon c-sky">⬆️</div><h3>Upload</h3><p>A4 with the key. Server returns <code>202</code>. Queue marks the row <code>SYNCED</code> with the <code>receiptId</code>.</p></div>
+      <div class="glass"><div class="icon c-peach">🧠</div><h3>Read</h3><p>Runner calls the reader. Validator cleans and checks. <code>applyExtraction</code> writes lines and <code>EXTRACTED</code>.</p></div>
+      <div class="glass"><div class="icon c-mint">🧾</div><h3>Decide</h3><p>Phone polls A3 and shows discrepancies. Clerk corrects, ticks, confirms. Row <code>CONFIRMED</code>.</p></div>
+    </div>
+    <div class="glass" style="margin-top:16px"><p>Demo order: scan a note, see the discrepancy, correct a quantity, confirm. Then airplane mode, capture, reconnect, and sync. Then the messy note.</p></div>
+  </section>
+
+  <section class="slide" data-title="Failure modes">
+    <div class="chapter-tag">05 · What goes wrong</div>
+    <h2>Failure modes and what the design does</h2>
+    <div class="glass" style="padding:16px 22px">
+      <table>
+        <thead><tr><th>Scenario</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td>Phone loses signal mid-upload</td><td>Row returns to <code>WAITING</code>. Same key on the next try, so no duplicate.</td></tr>
+          <tr><td>App killed while uploading</td><td>On start, <code>UPLOADING</code> becomes <code>WAITING</code>. The key is kept.</td></tr>
+          <tr><td>Phone retries after the server already saved</td><td>Key found, 200 with the existing receipt.</td></tr>
+          <tr><td>Model times out or returns garbage</td><td><code>NEEDS_MANUAL</code>. Photo kept. Clerk assigns the PO and enters quantities.</td></tr>
+          <tr><td>Note says PO-4503, supplier is Green Valley</td><td>Supplier check fails. PO cleared. <code>NEEDS_MANUAL</code>.</td></tr>
+          <tr><td>Server restarts with receipts in CAPTURED</td><td>Re-read at startup.</td></tr>
+          <tr><td>Photo over 10 MB</td><td>413 with <code>IMAGE_TOO_LARGE</code>. Row goes to <code>FAILED</code> with a plain reason.</td></tr>
+          <tr><td>Two clerks confirm and dispute at once</td><td>Row lock: only one wins, the other gets a 409.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Status and next">
+    <div class="chapter-tag">05 · Honest status</div>
+    <h2>What is proven, and what is not yet</h2>
+    <div class="grid g2" style="margin-top:8px">
+      <div class="glass">
+        <h3>Built and tested in code</h3>
+        <p>Matcher and validator unit tests, idempotent capture, the offline queue with Jest, and the lifecycle with its 409 rules.</p>
+        <div style="margin-top:12px"><span class="pill mint">matching</span><span class="pill mint">validation</span><span class="pill mint">queue</span><span class="pill mint">idempotency</span></div>
+      </div>
+      <div class="glass">
+        <h3>Not yet verified</h3>
+        <p>The real Gemini vision call against the messy note, and the airplane-mode demo on a device. DECISIONS.md flags both.</p>
+        <div style="margin-top:12px"><span class="pill peach">real vision call</span><span class="pill peach">airplane demo</span></div>
+      </div>
+      <div class="glass">
+        <h3>Cut for time</h3>
+        <p>Bonus items, login, and push notifications. The backend and the app are the whole scope.</p>
+      </div>
+      <div class="glass">
+        <h3>Next</h3>
+        <p>Run the real vision call end to end, add a clone-to-running README, then pick one bonus item.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide cover" data-title="Questions">
+    <div class="chapter-tag">Questions</div>
+    <h1>The AI reads. <span class="grad">Our code decides.</span></h1>
+    <p class="lead" style="margin-top:22px">Happy to trace any path in more detail: a photo through the queue, the validator, the matcher, or the database row.</p>
+  </section>
+
+</main>
+
+<!-- Navigation HUD -->
+<nav class="hud" aria-label="Slide navigation">
+  <div class="glass">
+    <button class="btn" id="prev" aria-label="Previous slide">← Back</button>
+    <span class="counter" id="counter">1 / 1</span>
+    <button class="btn" id="next" aria-label="Next slide">Next →</button>
+  </div>
+  <div class="glass"><span class="hint">← → · space · home/end</span></div>
+  <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+    var mermaidReady = false;
+    if (window.mermaid) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        themeVariables: {
+          fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif',
+          primaryColor: '#e4d8ff', primaryBorderColor: '#7c63c9', primaryTextColor: '#2f2a4a',
+          lineColor: '#7c63c9', secondaryColor: '#d3f6e7', tertiaryColor: '#ffe9a3',
+          noteBkgColor: '#ffe3d0', noteTextColor: '#2f2a4a', noteBorderColor: '#c0672f',
+          actorBkg: '#d8eefc', actorBorder: '#2f74a8', actorTextColor: '#2f2a4a',
+          signalColor: '#5d5778', signalTextColor: '#2f2a4a', labelBoxBkgColor: '#ffdbe6',
+          fontSize: '16px', edgeLabelBackground: '#fbf7ff'
+        },
+        sequence: { actorFontSize: 16, messageFontSize: 15, noteFontSize: 14, actorMargin: 40, width: 150 }
+      });
+      mermaidReady = true;
+    }
+    function renderDiagrams(slide) {
+      if (!mermaidReady) return;
+      var nodes = slide.querySelectorAll('pre.mermaid:not([data-done])');
+      if (!nodes.length) return;
+      Array.prototype.forEach.call(nodes, function (n) { n.setAttribute('data-done', '1'); });
+      try { mermaid.run({ nodes: nodes }); } catch (e) { /* diagram failed: slide still readable */ }
+    }
+    var counter = document.getElementById('counter');
+    var bar = document.getElementById('bar');
+    var prev = document.getElementById('prev');
+    var next = document.getElementById('next');
+    var current = 0;
+
+    function show(index) {
+      if (index < 0 || index >= slides.length) return;
+      slides.forEach(function (s, i) {
+        s.classList.toggle('active', i === index);
+        s.classList.toggle('past', i < index);
+        if (i === index) s.scrollTop = 0;
+      });
+      current = index;
+      renderDiagrams(slides[index]);
+      counter.textContent = (index + 1) + ' / ' + slides.length;
+      bar.style.width = ((index + 1) / slides.length * 100) + '%';
+      prev.disabled = index === 0;
+      next.disabled = index === slides.length - 1;
+      document.title = 'DockMind · ' + slides[index].getAttribute('data-title');
+      try { history.replaceState(null, '', '#' + (index + 1)); } catch (e) { /* storage or history blocked: ignore */ }
+    }
+
+    prev.addEventListener('click', function () { show(current - 1); });
+    next.addEventListener('click', function () { show(current + 1); });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); show(current + 1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(current - 1); }
+      else if (e.key === 'Home') show(0);
+      else if (e.key === 'End') show(slides.length - 1);
+    });
+
+    var startX = null;
+    document.addEventListener('touchstart', function (e) { startX = e.touches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      if (startX === null) return;
+      var dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 50) show(current + (dx < 0 ? 1 : -1));
+      startX = null;
+    }, { passive: true });
+
+    var fromHash = parseInt(location.hash.slice(1), 10);
+    show(isNaN(fromHash) ? 0 : Math.min(Math.max(fromHash - 1, 0), slides.length - 1));
+  })();
+</script>
+</body>
+</html>
