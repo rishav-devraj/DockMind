@@ -17,6 +17,8 @@ import com.dockmind.domain.ReceiptRepository;
 import com.dockmind.domain.ReceiptStatus;
 import com.dockmind.matching.Matcher;
 import com.dockmind.matching.Matcher.OrderLine;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReceiptService {
     static final String CLERK = "clerk-01";
     private static final String OPEN = "OPEN";
+    private static final BigDecimal MAX_QTY = new BigDecimal("1000000000");
 
     private final ReceiptRepository receipts;
     private final ReceiptImageRepository images;
@@ -118,7 +121,7 @@ public class ReceiptService {
             ReceiptLine line = receipt.newLine();
             line.setDescription(extracted.description());
             line.setPoLineId(extracted.poLineId());
-            line.setReceivedQty(extracted.qty() == null ? java.math.BigDecimal.ZERO : extracted.qty());
+            line.setReceivedQty(extracted.qty() == null ? BigDecimal.ZERO : extracted.qty());
             line.setAiQty(extracted.qty());
             line.setUnit(extracted.unit());
             line.setConfidence(extracted.confidence());
@@ -126,6 +129,118 @@ public class ReceiptService {
         recompute(receipt);
         receipt.setStatus(result.manual() ? ReceiptStatus.NEEDS_MANUAL : ReceiptStatus.EXTRACTED);
         receipt.touch();
+    }
+
+    /** The clerk's number always wins over the reader's. */
+    @Transactional
+    public ReceiptView correctLine(String id, String lineId, BigDecimal receivedQty, String unit) {
+        if (receivedQty == null || receivedQty.signum() < 0 || receivedQty.compareTo(MAX_QTY) > 0) {
+            throw ApiException.badRequest("INVALID_QUANTITY", "receivedQty must be a number from 0 to 1000000000.");
+        }
+        String normalizedUnit = Matcher.normalizeUnit(unit);
+        if (unit != null && normalizedUnit == null) {
+            throw ApiException.badRequest("INVALID_UNIT", "unit must not be blank.");
+        }
+        Receipt receipt = lockReceipt(id);
+        Long parsedLineId = ReceiptView.parseLineId(lineId);
+        ReceiptLine line = receipt.getLines().stream()
+                .filter(candidate -> candidate.getId().equals(parsedLineId))
+                .findFirst()
+                .orElseThrow(ApiException::lineNotFound);
+        if (receipt.getStatus().isTerminal()) {
+            throw ApiException.conflict("RECEIPT_CLOSED", "This receipt is already " + receipt.getStatus() + " and cannot be edited.");
+        }
+        line.setReceivedQty(receivedQty.setScale(3, RoundingMode.HALF_UP));
+        if (normalizedUnit != null) {
+            line.setUnit(normalizedUnit);
+        }
+        line.setCorrectedByClerk(true);
+        recompute(receipt);
+        receipt.touch();
+        return ReceiptView.from(receipt);
+    }
+
+    @Transactional
+    public ReceiptView confirm(String id) {
+        Receipt receipt = lockReceipt(id);
+        switch (receipt.getStatus()) {
+            case CONFIRMED -> {
+                return ReceiptView.from(receipt);
+            }
+            case DISPUTED -> throw ApiException.conflict("ALREADY_DISPUTED", "This receipt was disputed and cannot be confirmed.");
+            case CAPTURED -> throw notReady();
+            default -> {
+            }
+        }
+        if (receipt.getPoNumber() == null) {
+            throw ApiException.conflict("PO_UNRESOLVED", "Choose the purchase order before confirming.");
+        }
+        receipt.setStatus(ReceiptStatus.CONFIRMED);
+        receipt.touch();
+        return ReceiptView.from(receipt);
+    }
+
+    @Transactional
+    public ReceiptView dispute(String id, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw ApiException.badRequest("REASON_REQUIRED", "A reason is required to dispute a receipt.");
+        }
+        if (reason.length() > Receipt.TEXT_LIMIT) {
+            throw ApiException.badRequest("REASON_TOO_LONG", "The reason must be 2000 characters or fewer.");
+        }
+        Receipt receipt = lockReceipt(id);
+        switch (receipt.getStatus()) {
+            case DISPUTED -> {
+                return ReceiptView.from(receipt);
+            }
+            case CONFIRMED -> throw ApiException.conflict("ALREADY_CONFIRMED", "This receipt was confirmed and cannot be disputed.");
+            case CAPTURED -> throw notReady();
+            default -> {
+            }
+        }
+        receipt.setDisputeReason(reason.trim());
+        receipt.setStatus(ReceiptStatus.DISPUTED);
+        receipt.touch();
+        return ReceiptView.from(receipt);
+    }
+
+    /** The clerk has identified the PO, so it carries full confidence and no longer flags the receipt. */
+    @Transactional
+    public ReceiptView assignPo(String id, String poNumber) {
+        if (poNumber == null || poNumber.isBlank()) {
+            throw ApiException.badRequest("PO_REQUIRED", "poNumber is required.");
+        }
+        Receipt receipt = lockReceipt(id);
+        PurchaseOrder po = purchaseOrders.findByPoNumber(poNumber.trim()).orElseThrow(ApiException::poNotFound);
+        switch (receipt.getStatus()) {
+            case CAPTURED -> throw notReady();
+            case CONFIRMED, DISPUTED ->
+                throw ApiException.conflict("RECEIPT_CLOSED", "This receipt is already " + receipt.getStatus() + " and cannot be edited.");
+            case EXTRACTED -> {
+                if (po.getPoNumber().equals(receipt.getPoNumber())) {
+                    return ReceiptView.from(receipt);
+                }
+                throw ApiException.conflict("PO_ALREADY_RESOLVED", "This receipt already has a purchase order.");
+            }
+            default -> {
+            }
+        }
+        receipt.setPoNumber(po.getPoNumber());
+        receipt.setSupplier(po.getSupplier());
+        receipt.setPoConfidence(1.0);
+        matcher.relinkByDescription(receipt.getLines(), orderLines(po));
+        recompute(receipt);
+        receipt.setStatus(ReceiptStatus.EXTRACTED);
+        receipt.touch();
+        return ReceiptView.from(receipt);
+    }
+
+    private Receipt lockReceipt(String id) {
+        return receipts.findForUpdate(ReceiptView.parseReceiptId(id)).orElseThrow(ApiException::receiptNotFound);
+    }
+
+    private static ApiException notReady() {
+        return ApiException.conflict("NOT_READY", "This note is still being read. Try again in a moment.");
     }
 
     private void recompute(Receipt receipt) {
