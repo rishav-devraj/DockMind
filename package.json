@@ -1,0 +1,7 @@
+{
+  "name": "dockmind",
+  "private": true,
+  "scripts": {
+    "webpreview": "npm --prefix web install && npm --prefix web run dev"
+  }
+}
