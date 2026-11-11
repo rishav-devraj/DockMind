@@ -1,0 +1,14 @@
+{
+  "supplierName": "Dairy Direct",
+  "deliveryNoteNo": "DN-30455",
+  "poNumber": "PO-4513",
+  "poConfidence": 0.55,
+  "lines": [
+    { "description": "Milk 1L", "poLineId": "POL-4503-1", "qty": 252, "unit": "EA", "confidence": 0.74 },
+    { "description": "Butter 500g", "poLineId": "POL-4503-2", "qty": 100, "unit": "CASE", "confidence": 0.68 },
+    { "description": "Cheddar", "poLineId": "POL-4503-3", "qty": 38, "unit": "KG", "confidence": 0.71 }
+  ],
+  "freeText": "left at bay 3",
+  "overallConfidence": 0.62,
+  "aiNote": "Handwritten and hard to read. One digit of the PO number is smudged, so please check it."
+}

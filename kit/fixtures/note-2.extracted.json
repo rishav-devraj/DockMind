@@ -1,0 +1,13 @@
+{
+  "supplierName": "Blue Ocean Seafood Co.",
+  "deliveryNoteNo": "DN-30417",
+  "poNumber": "PO-4502",
+  "poConfidence": 0.97,
+  "lines": [
+    { "description": "Salmon fillet", "poLineId": "POL-4502-1", "qty": 72, "unit": "KG", "confidence": 0.95 },
+    { "description": "Scallops", "poLineId": null, "qty": 10, "unit": "KG", "confidence": 0.93 }
+  ],
+  "freeText": null,
+  "overallConfidence": 0.94,
+  "aiNote": "Salmon looks light against the order, scallops are not on the PO and there are no prawns on the note."
+}
