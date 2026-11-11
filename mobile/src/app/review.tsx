@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { Receipt } from '@/api/types';
@@ -7,9 +7,13 @@ import { Screen } from '@/components/Screen';
 import { Button, Card, Loading, Message, Notice } from '@/components/ui';
 import { api } from '@/lib/runtime';
 import { uploadQueue, useQueueItems } from '@/queue/runtime';
+import { CheckRow } from '@/review/CheckRow';
+import { needsPoCheck } from '@/review/decision';
+import { DecisionPanel } from '@/review/DecisionPanel';
 import { STATUS_LABELS } from '@/review/labels';
 import { LineCard } from '@/review/LineCard';
 import { LineEditor } from '@/review/LineEditor';
+import { PoPicker } from '@/review/PoPicker';
 import { useReceipt } from '@/review/useReceipt';
 import { colors, spacing, type } from '@/theme';
 
@@ -78,6 +82,16 @@ function ReceiptReview({ receipt, onChange, onConflict }: ReceiptReviewProps) {
   const [showPhoto, setShowPhoto] = useState(false);
   const photoUri = api.receiptImageUri(receipt.id);
   const editable = receipt.status === 'EXTRACTED' || receipt.status === 'NEEDS_MANUAL';
+  const [checkedLines, setCheckedLines] = useState<ReadonlySet<string>>(new Set());
+  const [poChecked, setPoChecked] = useState(false);
+  const checks = useMemo(() => ({ lineIds: checkedLines, poChecked }), [checkedLines, poChecked]);
+
+  const toggleLine = (lineId: string) =>
+    setCheckedLines((current) => {
+      const next = new Set(current);
+      if (!next.delete(lineId)) next.add(lineId);
+      return next;
+    });
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -95,8 +109,20 @@ function ReceiptReview({ receipt, onChange, onConflict }: ReceiptReviewProps) {
         ) : null}
       </Card>
 
+      {editable && needsPoCheck(receipt) ? (
+        <Card>
+          <CheckRow
+            label={`${receipt.poNumber} and ${receipt.supplier ?? 'the supplier'} match the paper note`}
+            checked={poChecked}
+            onToggle={() => setPoChecked((value) => !value)}
+          />
+        </Card>
+      ) : null}
       {receipt.status === 'NEEDS_MANUAL' ? (
         <Notice text="The note could not be read. Pick the purchase order, then enter the quantities by hand." />
+      ) : null}
+      {editable && receipt.poNumber === null ? (
+        <PoPicker receiptId={receipt.id} onAssigned={onChange} onConflict={onConflict} />
       ) : null}
       {receipt.aiNote ? (
         <Card>
@@ -127,6 +153,13 @@ function ReceiptReview({ receipt, onChange, onConflict }: ReceiptReviewProps) {
               onConflict={onConflict}
             />
           ) : null}
+          {editable && line.needsReview ? (
+            <CheckRow
+              label="I checked this line against the paper"
+              checked={checkedLines.has(line.id)}
+              onToggle={() => toggleLine(line.id)}
+            />
+          ) : null}
         </LineCard>
       ))}
 
@@ -142,6 +175,17 @@ function ReceiptReview({ receipt, onChange, onConflict }: ReceiptReviewProps) {
           ) : null}
         </View>
       ) : null}
+
+      {editable ? (
+        <DecisionPanel
+          receipt={receipt}
+          checks={checks}
+          onDecided={onChange}
+          onConflict={onConflict}
+        />
+      ) : (
+        <Button label="Back to purchase orders" onPress={() => router.dismissTo('/')} />
+      )}
     </ScrollView>
   );
 }
