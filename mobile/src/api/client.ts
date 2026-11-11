@@ -35,6 +35,7 @@ export interface ApiClient {
 export interface ApiClientDeps {
   isOnline: () => boolean;
   persistence: MockPersistence;
+  imageSize: (uri: string) => number;
 }
 
 export function createApiClient(deps: ApiClientDeps): ApiClient {
