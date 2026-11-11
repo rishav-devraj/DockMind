@@ -18,6 +18,8 @@ Tool: Claude Code, running one coordinating session and two parallel agents (bac
 
 3. The expo login fiasco, it took me 30 minutes to finally get the app to run on my iphone, there was some auth issue paired with expo login and i was unable to login with the normal method
 
+4. Form data issue while creating upload picture payload on app side was causing requests to fail.
+
 ## What we rewrote by hand, and why
 
 To be completed by the person submitting. This must be a real edit.
