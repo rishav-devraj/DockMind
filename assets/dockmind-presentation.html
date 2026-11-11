@@ -500,6 +500,110 @@ sequenceDiagram
     <div class="glass" style="margin-top:16px"><p>Duplicates are impossible by construction: the key is written before the first upload, reused on every retry, and the server's unique constraint returns the existing receipt.</p></div>
   </section>
 
+  <section class="slide" data-title="App architecture offline queue">
+    <div class="chapter-tag">03 · LLD · App architecture, offline queue</div>
+    <h2>Two databases, one queue, and what wakes it</h2>
+    <div class="glass" style="padding:14px 16px;overflow:visible">
+      <pre class="mermaid" data-diagram="app-arch" style="overflow:visible;min-height:0">
+flowchart TB
+  subgraph Phone["Phone: Expo app"]
+    Cam["Capture screen&lt;br/&gt;camera or gallery"]
+    Save["saveCapture&lt;br/&gt;downscale, make key"]
+    Queue["UploadQueue&lt;br/&gt;single flight, strict order"]
+    Api["HttpApiClient"]
+    Net["NetInfo&lt;br/&gt;isConnected"]
+    Fg["AppState&lt;br/&gt;returns to foreground"]
+    Retry["Retry button&lt;br/&gt;on FAILED items"]
+    Poll["Review screen&lt;br/&gt;polls A3"]
+    subgraph Local["Local storage on the phone"]
+      FS[("captures folder&lt;br/&gt;photo .jpg")]
+      SQ[("SQLite dockmind.db&lt;br/&gt;queue_items, kv PO cache")]
+    end
+  end
+  subgraph Server["Server: Spring Boot"]
+    A4["POST /receipts, A4&lt;br/&gt;Idempotency-Key"]
+    A3["GET /receipts/id, A3"]
+    Ext["Extraction worker"]
+  end
+  H2[("Server DB: H2&lt;br/&gt;receipts, receipt_images, POs")]
+  Cam --> Save
+  Save -->|"1 copy photo"| FS
+  Save -->|"2 insert WAITING row, same key"| SQ
+  Save -->|"3 wake"| Queue
+  Queue -->|"read first WAITING row"| SQ
+  Queue -->|"mark UPLOADING"| SQ
+  Queue --> Api
+  Api -->|"photo + key"| A4
+  A4 --> H2
+  A4 --> Ext
+  Ext --> H2
+  Api -->|"SYNCED with receiptId"| SQ
+  Net -->|"back online: wake"| Queue
+  Fg -->|"foreground: wake"| Queue
+  Retry -->|"FAILED to WAITING"| Queue
+  Poll --> Api
+  Api --> A3
+  A3 --> H2
+      </pre>
+    </div>
+    <p style="margin-top:12px"><b>Phone storage:</b> SQLite keeps the queue and the last open-PO list. The photo lives in a file, and the row points to it. <b>Server storage:</b> H2 holds the receipt and its photo in one transaction, and the unique key makes a retry return the same receipt.</p>
+  </section>
+
+  <section class="slide" data-title="Offline upload sequence">
+    <div class="chapter-tag">03 · LLD · Offline upload, step by step</div>
+    <h2>Capture in airplane mode, sync when the signal returns</h2>
+    <div class="glass" style="padding:14px 16px">
+      <pre class="mermaid" data-diagram="queue-seq">
+sequenceDiagram
+  autonumber
+  participant C as Clerk
+  participant S as Save and queue
+  participant DB as SQLite on phone
+  participant N as NetInfo and AppState
+  participant Q as UploadQueue
+  participant Srv as Server
+  C->>S: Shutter tap, no signal
+  S->>DB: Insert row WAITING with new key
+  S-->>C: Waiting to sync banner
+  Note over Q: Drain runs but nothing is sent offline
+  N->>Q: Back online or app foregrounded
+  Q->>DB: Mark row UPLOADING, attempts plus one
+  Q->>Srv: POST /receipts with the same key
+  alt 202 or 200
+    Srv-->>Q: receipt id
+    Q->>DB: SYNCED with receiptId
+  else network error, 5xx or timeout
+    Q->>DB: WAITING, next try after backoff
+  else 400 or 413
+    Q->>DB: FAILED with a plain reason
+  end
+      </pre>
+    </div>
+  </section>
+
+  <section class="slide" data-title="Wake-up and recovery methods">
+    <div class="chapter-tag">03 · LLD · Methods for the queue</div>
+    <h2>What wakes the queue, and what it does on each</h2>
+    <div class="glass" style="padding:16px 22px">
+      <table>
+        <thead><tr><th>Trigger</th><th>What the queue does</th></tr></thead>
+        <tbody>
+          <tr><td>New capture</td><td>Copies the photo, writes a WAITING row with the key, then drains</td></tr>
+          <tr><td>Connectivity returns (NetInfo)</td><td>Clears backoff timers on WAITING rows, then drains</td></tr>
+          <tr><td>App returns to foreground (AppState)</td><td>Same as connectivity: clear backoff, then drain</td></tr>
+          <tr><td>App start or relaunch</td><td>Runs once per process. Rows left in UPLOADING go back to WAITING with the same key</td></tr>
+          <tr><td>Network error, 5xx or timeout</td><td>WAITING with exponential backoff: 2 s, doubling, capped at 60 s</td></tr>
+          <tr><td>400 or 413</td><td>FAILED with a plain reason. Shown with a Retry button</td></tr>
+          <tr><td>Clerk taps Retry</td><td>Attempts reset, same key kept, back to WAITING, then drains</td></tr>
+          <tr><td>Drain requested while one is running</td><td>Single flight: sets a rerun flag instead of starting a second run</td></tr>
+          <tr><td>SQLite error</td><td>Logged, and the queue looks again after 60 s instead of stopping</td></tr>
+          <tr><td>Strict order</td><td>The first WAITING row must be ready. A newer row never overtakes one that is backing off</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:12px">Offline PO list: the last successful list is saved in the <code>kv</code> table, and the app shows it with its saved time when the server cannot be reached.</p>
+  </section>
+
   <section class="slide" data-title="Review and decision">
     <div class="chapter-tag">03 · LLD · Review and decide</div>
     <h2>The app renders, the server decides</h2>
