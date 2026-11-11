@@ -3,6 +3,10 @@ package com.dockmind.api;
 import com.dockmind.domain.ReceiptStatus;
 import com.dockmind.service.CaptureService;
 import com.dockmind.service.ReceiptService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
@@ -42,11 +46,18 @@ public class ReceiptController {
         return receipts.get(id);
     }
 
+    /** Only describes the upload for Swagger. */
+    public record CaptureForm(@Schema(type = "string", format = "binary", requiredMode = Schema.RequiredMode.REQUIRED) String image) {
+    }
+
+    // Documented here rather than with consumes=, which would turn a non-multipart request's 400 into a 415.
+    @Operation(requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content =
+            @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE, schema = @Schema(implementation = CaptureForm.class))))
     @PostMapping
     public ResponseEntity<ReceiptView> capture(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader(value = "X-Fixture", required = false) String fixture,
-            @RequestParam("image") MultipartFile image) throws IOException {
+            @Parameter(hidden = true) @RequestParam("image") MultipartFile image) throws IOException {
         CaptureService.Captured result =
                 capture.capture(idempotencyKey, image.getBytes(), fixture, image.getOriginalFilename());
         return ResponseEntity.status(result.created() ? HttpStatus.ACCEPTED : HttpStatus.OK).body(result.receipt());
