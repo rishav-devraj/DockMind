@@ -65,7 +65,7 @@
   .deck { position: relative; z-index: 1; height: 100%; }
   .slide {
     position: absolute; inset: 0;
-    display: flex; flex-direction: column; justify-content: center;
+    display: flex; flex-direction: column; justify-content: safe center;
     padding: 56px clamp(28px, 6vw, 96px) 96px;
     opacity: 0; transform: translateX(40px) scale(.985);
     pointer-events: none;
@@ -226,6 +226,10 @@
   }
   .mermaid { background: rgba(255,255,255,.55); border: 1px solid #fff; border-radius: 18px; padding: 14px; overflow-x: auto; color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.5; text-align: center; min-height: 220px; }
   .mermaid svg { max-width: 100%; height: auto; }
+  /* Never crop a diagram: the card grows, and the slide scrolls if the diagram is taller than the window. */
+  .glass:has(pre.mermaid) { overflow: visible; }
+  pre.mermaid { overflow: visible; min-height: 0; }
+  .mermaid svg { display: block; margin: 0 auto; }
   .offline-grid { display: grid; grid-template-columns: .9fr 1.3fr; gap: 18px; align-items: stretch; }
   @media (max-width: 760px) { .offline-grid { grid-template-columns: 1fr; } }
   @media (prefers-reduced-motion: reduce) {
