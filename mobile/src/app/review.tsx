@@ -9,6 +9,7 @@ import { api } from '@/lib/runtime';
 import { uploadQueue, useQueueItems } from '@/queue/runtime';
 import { STATUS_LABELS } from '@/review/labels';
 import { LineCard } from '@/review/LineCard';
+import { LineEditor } from '@/review/LineEditor';
 import { useReceipt } from '@/review/useReceipt';
 import { colors, spacing, type } from '@/theme';
 
@@ -56,7 +57,7 @@ export default function Review() {
       />
     );
   } else {
-    body = <ReceiptReview receipt={receipt} onChange={setReceipt} />;
+    body = <ReceiptReview receipt={receipt} onChange={setReceipt} onConflict={retry} />;
   }
 
   return (
@@ -67,9 +68,16 @@ export default function Review() {
   );
 }
 
-function ReceiptReview({ receipt }: { receipt: Receipt; onChange: (next: Receipt) => void }) {
+interface ReceiptReviewProps {
+  receipt: Receipt;
+  onChange: (next: Receipt) => void;
+  onConflict: () => void;
+}
+
+function ReceiptReview({ receipt, onChange, onConflict }: ReceiptReviewProps) {
   const [showPhoto, setShowPhoto] = useState(false);
   const photoUri = api.receiptImageUri(receipt.id);
+  const editable = receipt.status === 'EXTRACTED' || receipt.status === 'NEEDS_MANUAL';
 
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -110,7 +118,16 @@ function ReceiptReview({ receipt }: { receipt: Receipt; onChange: (next: Receipt
       ) : null}
 
       {receipt.lines.map((line) => (
-        <LineCard key={line.id} line={line} />
+        <LineCard key={line.id} line={line}>
+          {editable ? (
+            <LineEditor
+              receiptId={receipt.id}
+              line={line}
+              onSaved={onChange}
+              onConflict={onConflict}
+            />
+          ) : null}
+        </LineCard>
       ))}
 
       {photoUri ? (
