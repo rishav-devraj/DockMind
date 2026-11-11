@@ -188,7 +188,7 @@ function ReceiptReview({ receipt, onChange, onConflict }: ReceiptReviewProps) {
           onConflict={onConflict}
         />
       ) : (
-        <Button label="Back to purchase orders" onPress={() => router.dismissTo('/')} />
+        <Button label="Back to purchase orders" onPress={() => router.dismissAll()} />
       )}
     </ScrollView>
   );
