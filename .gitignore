@@ -1,0 +1,25 @@
+# Organizer's brief, not ours to publish
+*Hackathon Brief.html
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Backend
+backend/target/
+backend/data/
+
+# Mobile
+node_modules/
+.expo/
+mobile/dist/
+mobile/android/
+mobile/ios/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
