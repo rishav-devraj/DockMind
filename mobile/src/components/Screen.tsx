@@ -1,0 +1,31 @@
+import type { ReactNode } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { useIsOnline } from '../lib/network';
+import { colors, spacing, type } from '../theme';
+
+/** Every screen sits inside this, so the offline banner shows across the whole app. */
+export function Screen({ children }: { children: ReactNode }) {
+  const online = useIsOnline();
+  return (
+    <View style={styles.screen}>
+      {online ? null : (
+        <View style={styles.banner} accessibilityRole="alert">
+          <Text style={styles.bannerText}>No signal. Photos are saved and upload later.</Text>
+        </View>
+      )}
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  banner: { backgroundColor: colors.offlineBg, padding: spacing.md },
+  bannerText: {
+    color: colors.offlineText,
+    fontSize: type.body,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+});

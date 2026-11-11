@@ -1,10 +1,11 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Fixture } from '@/api/types';
 import { pickFromGallery, PickResult, takePhoto } from '@/capture/photo';
 import { saveCapture } from '@/capture/saveCapture';
+import { Screen } from '@/components/Screen';
 import { Button, Notice } from '@/components/ui';
 import { apiMode } from '@/config';
 import { colors, spacing, tapTarget, type } from '@/theme';
@@ -21,7 +22,6 @@ const showFixtures = __DEV__ || apiMode === 'mock';
 export default function Capture() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [saved, setSaved] = useState<string | null>(null);
   const [fixture, setFixture] = useState<Fixture>('note-2');
   const inFlight = useRef(false);
 
@@ -30,13 +30,12 @@ export default function Capture() {
     inFlight.current = true;
     setBusy(true);
     setProblem(null);
-    setSaved(null);
     try {
       const result = await pick();
       if (result.kind === 'denied') setProblem(result.message);
       if (result.kind === 'picked') {
-        const item = await saveCapture(result.asset, showFixtures ? fixture : null);
-        setSaved(`Saved as item ${item.id}. It will upload as soon as there is signal.`);
+        await saveCapture(result.asset, showFixtures ? fixture : null);
+        router.replace('/queue');
       }
     } catch {
       setProblem('Could not save that photo. Try taking it again.');
@@ -47,11 +46,11 @@ export default function Capture() {
   };
 
   return (
-    <View style={styles.screen}>
+    <Screen>
+      <View style={styles.content}>
       <Stack.Screen options={{ title: 'Capture note' }} />
       <Text style={styles.intro}>Photograph the whole delivery note, flat and in good light.</Text>
       {problem ? <Notice text={problem} /> : null}
-      {saved ? <Notice text={saved} /> : null}
       {showFixtures ? (
         <View style={styles.fixtures}>
           <Text style={styles.fixtureTitle}>Test note</Text>
@@ -82,12 +81,13 @@ export default function Capture() {
         onPress={() => run(pickFromGallery)}
         disabled={busy}
       />
-    </View>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background, padding: spacing.lg, gap: spacing.md },
+  content: { flex: 1, padding: spacing.lg, gap: spacing.md },
   intro: { fontSize: type.body, color: colors.text },
   fixtures: { gap: spacing.sm },
   fixtureTitle: { fontSize: type.small, fontWeight: '700', color: colors.textMuted },

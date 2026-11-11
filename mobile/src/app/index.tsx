@@ -4,14 +4,17 @@ import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { plainMessage } from '@/api/errors';
 import type { PurchaseOrder } from '@/api/types';
+import { Screen } from '@/components/Screen';
 import { Button, Card, Loading, Message, Notice } from '@/components/ui';
 import { loadOpenPurchaseOrders, PurchaseOrderList } from '@/lib/poCache';
+import { useQueueItems } from '@/queue/runtime';
 import { colors, spacing, type } from '@/theme';
 
 export default function OpenPurchaseOrders() {
   const [list, setList] = useState<PurchaseOrderList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const pending = useQueueItems().filter((item) => item.status !== 'SYNCED').length;
 
   const load = useCallback(async () => {
     try {
@@ -67,13 +70,18 @@ export default function OpenPurchaseOrders() {
   }
 
   return (
-    <View style={styles.screen}>
+    <Screen>
       <Stack.Screen options={{ title: 'Open POs' }} />
       {body}
       <View style={styles.footer}>
         <Button label="Capture delivery note" onPress={() => router.push('/capture')} />
+        <Button
+          label={pending > 0 ? `Upload queue (${pending} pending)` : 'Upload queue'}
+          variant="secondary"
+          onPress={() => router.push('/queue')}
+        />
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -95,9 +103,8 @@ function OrderCard({ order }: { order: PurchaseOrder }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
-  footer: { padding: spacing.lg, backgroundColor: colors.surface },
+  footer: { padding: spacing.lg, gap: spacing.sm, backgroundColor: colors.surface },
   poNumber: { fontSize: type.title, fontWeight: '700', color: colors.text },
   supplier: { fontSize: type.body, color: colors.textMuted },
   line: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
