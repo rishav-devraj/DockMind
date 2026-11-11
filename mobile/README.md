@@ -2,7 +2,7 @@
 
 The Expo app a receiving clerk uses at the dock: photograph a delivery note, review it against the purchase order, correct quantities, then confirm or dispute. Capture keeps working with no signal.
 
-The app currently runs against an in-app mock of the API. The real backend is not wired in yet.
+The app talks to the real backend, by default the one hosted at `https://dockmind-bsxe.onrender.com`.
 
 ## Run it
 
@@ -29,60 +29,38 @@ npx expo lint        # lint
 npx expo export --platform android
 ```
 
-### Mock or real API
+### Choosing the server
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `EXPO_PUBLIC_API_MODE` | `mock` | `mock` or `http`. This is the only change needed to use the real API. |
-| `EXPO_PUBLIC_API_URL` | `http://10.0.2.2:8080` | Backend address. `10.0.2.2` is the host machine as seen from the Android emulator. |
-
-In development the Capture screen shows a **Test note** picker that selects the fixture (`X-Fixture`):
-
-| Option | Behaviour in the mock |
-|---|---|
-| Clean | Everything matches |
-| Short | Salmon 8 kg short, scallops not ordered |
-| Messy, slow | 15 second read, low confidence, wrong unit, one line not delivered |
-| Unreadable | Ends in `NEEDS_MANUAL`, the clerk picks the PO |
+| `EXPO_PUBLIC_API_URL` | `https://dockmind-bsxe.onrender.com` | Backend address. For a server on this PC, use `http://10.0.2.2:8080` from the Android emulator. Restart with `npx expo start -c` after changing it. |
 
 ## How it is built
 
 - **`src/app/`**: screens, using Expo Router. Open POs, Capture, Upload queue, Review, Receipts.
-- **`src/api/`**: `types.ts` mirrors `CONTRACT.md`. `client.ts` defines `ApiClient`, implemented by `http.ts` and `mock.ts`. Screens never call `fetch`.
+- **`src/api/`**: `types.ts` mirrors `CONTRACT.md`. `client.ts` defines `ApiClient`, implemented by `http.ts`. Screens never call `fetch`.
 - **`src/queue/`**: the offline queue. `queue.ts` is pure logic with injected storage, uploader and clock, so it can be unit tested. `sqliteStore.ts` and `runtime.ts` connect it to the device.
 - **`src/capture/`**: picks the photo, shrinks it to about 1600 px, saves it as JPEG.
 - **`src/review/`**: receipt polling, line cards, correction, confirm and dispute. `decision.ts` holds the rule for when Confirm is allowed.
 
 Every capture follows one path: save the photo to app storage, generate the idempotency key, write a SQLite row, then try the upload. The queue uploads in order, one at a time, with backoff. A row left `UPLOADING` by an app kill returns to `WAITING` with the same key.
 
-The app does no matching. It shows the `discrepancy` and `delta` the server sends. The only matching code is in the mock, which stands in for the backend.
+The app does no matching. It shows the `discrepancy` and `delta` the server sends.
 
 ## Status
 
-All nine APIs are `[mocked]`. None has been run against the real backend.
-
-| API | Status | Seen working on the emulator |
-|---|---|---|
-| A1 list POs | `[mocked]` | Yes |
-| A2 list receipts | `[mocked]` | Yes |
-| A3 get receipt, polling | `[mocked]` | Yes |
-| A4 upload | `[mocked]` | Yes |
-| A5 correct a line | `[mocked]` | Yes, 72 to 80 changed Short to Match |
-| A6 confirm | `[mocked]` | Yes |
-| A7 dispute | `[mocked]` | No, unit test only |
-| A8 assign PO | `[mocked]` | No, unit test only |
-| A9 photo | `[mocked]` | No, the button shows but the photo was not opened |
+All nine APIs now call the real backend through `http.ts`. The screens were exercised on the emulator against an in-app mock, since removed, and have not yet been run against the real server.
 
 ### Delivery gate
 
 | Check | Result |
 |---|---|
 | `npx tsc --noEmit` | Clean |
-| Jest | 28 tests pass in 4 suites, including queue order, same key on retry, recovery from a kill, and `FAILED` handling |
+| Jest | 20 tests pass in 3 suites, including queue order, same key on retry, recovery from a kill, and `FAILED` handling |
 | `npx expo lint` | Clean |
 | `npx expo-doctor` | 20 of 20 checks pass |
 | `npx expo export --platform android` | Succeeds |
-| Emulator in mock mode | Partly done, see below |
+| Emulator against the real server | Not done yet |
 
 ### Not verified yet
 

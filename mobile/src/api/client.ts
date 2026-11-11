@@ -1,6 +1,5 @@
-import { apiMode, apiUrl } from '../config';
+import { apiUrl } from '../config';
 import { HttpApiClient } from './http';
-import { MockApiClient, MockPersistence } from './mock';
 import type {
   CorrectLineRequest,
   PurchaseOrder,
@@ -32,12 +31,6 @@ export interface ApiClient {
   receiptImageUri(id: string): string | null;
 }
 
-export interface ApiClientDeps {
-  isOnline: () => boolean;
-  persistence: MockPersistence;
-  imageSize: (uri: string) => number;
-}
-
-export function createApiClient(deps: ApiClientDeps): ApiClient {
-  return apiMode === 'http' ? new HttpApiClient(apiUrl) : new MockApiClient(deps);
+export function createApiClient(): ApiClient {
+  return new HttpApiClient(apiUrl);
 }
