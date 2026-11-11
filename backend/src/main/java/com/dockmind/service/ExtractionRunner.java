@@ -45,7 +45,7 @@ public class ExtractionRunner {
             Optional<ExtractionRequest> request = receipts.extractionRequest(receiptId);
             if (request.isPresent()) {
                 String raw = extractor.extract(request.get());
-                receipts.applyExtraction(receiptId, validator.validate(raw, request.get().openPos()));
+                receipts.applyExtraction(receiptId, validator.validate(raw, receipts::findOpenPo));
             }
         } catch (Exception e) {
             log.warn("Extraction failed for receipt {}", receiptId, e);

@@ -25,7 +25,7 @@ public class LlmGateway {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     @Value("${llm.api-key:${LLM_API_KEY:}}") private String apiKey;
-    @Value("${llm.model:gemini-2.5-flash}")  private String model;
+    @Value("${llm.model:gemini-3.1-flash-lite}")  private String model;
 
     /** Text only. Returns the model's raw text (may include markdown fences even when you ask for JSON). */
     public String callLLM(String prompt) throws Exception {
@@ -45,7 +45,9 @@ public class LlmGateway {
         }
         var body = Map.of(
             "contents", List.of(Map.of("parts", parts)),
-            "generationConfig", Map.of("responseMimeType", "application/json", "temperature", 0.1));
+            // Thinking off: the reader only transcribes, and a thinking pass pushed calls past the timeout.
+            "generationConfig", Map.of("responseMimeType", "application/json", "temperature", 0.1,
+                "thinkingConfig", Map.of("thinkingBudget", 0)));
         var req = HttpRequest.newBuilder(URI.create(
                 "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"))
             .timeout(Duration.ofSeconds(30))

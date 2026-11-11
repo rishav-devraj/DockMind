@@ -42,15 +42,15 @@ public class ExtractionValidator {
     private static final Set<String> SUPPLIER_SUFFIXES =
             Set.of("ltd", "limited", "co", "company", "inc", "llc", "plc", "corp");
 
-    public ValidatedExtraction validate(String raw, List<OpenPo> openPos) {
+    public ValidatedExtraction validate(String raw, PoLookup purchaseOrders) {
         try {
-            return parse(raw, openPos);
+            return parse(raw, purchaseOrders);
         } catch (JsonProcessingException | RuntimeException e) {
             return ValidatedExtraction.failed(UNREADABLE_NOTE);
         }
     }
 
-    private ValidatedExtraction parse(String raw, List<OpenPo> openPos) throws JsonProcessingException {
+    private ValidatedExtraction parse(String raw, PoLookup purchaseOrders) throws JsonProcessingException {
         if (raw == null || raw.isBlank()) {
             return ValidatedExtraction.failed(UNREADABLE_NOTE);
         }
@@ -75,7 +75,7 @@ public class ExtractionValidator {
         String freeText = text(root.get("freeText"), Receipt.TEXT_LIMIT);
         Double overall = confidence(root.get("overallConfidence"));
         String aiNote = text(root.get("aiNote"), Receipt.TEXT_LIMIT);
-        OpenPo po = resolve(text(root.get("poNumber"), Receipt.NAME_LIMIT), supplier, openPos);
+        OpenPo po = resolve(text(root.get("poNumber"), Receipt.NAME_LIMIT), supplier, purchaseOrders);
 
         if (po == null || anyUnreadable) {
             String note = anyUnreadable ? UNREADABLE_LINE_NOTE : aiNote != null ? aiNote : UNRESOLVED_PO_NOTE;
@@ -106,15 +106,12 @@ public class ExtractionValidator {
     }
 
     /** A PO counts only if the number exists and the note's supplier agrees. PO-4503 and PO-4513 differ by one digit. */
-    private static OpenPo resolve(String poNumber, String supplier, List<OpenPo> openPos) {
+    private static OpenPo resolve(String poNumber, String supplier, PoLookup purchaseOrders) {
         if (poNumber == null || supplier == null) {
             return null;
         }
-        String wanted = alphanumeric(poNumber);
-        return openPos.stream()
-                .filter(po -> alphanumeric(po.poNumber()).equals(wanted))
+        return purchaseOrders.findOpen(poNumber)
                 .filter(po -> supplierWords(po.supplier()).equals(supplierWords(supplier)))
-                .findFirst()
                 .orElse(null);
     }
 
@@ -190,10 +187,6 @@ public class ExtractionValidator {
 
     private static Double orZero(Double value) {
         return value == null ? Double.valueOf(0.0) : value;
-    }
-
-    private static String alphanumeric(String value) {
-        return value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
     }
 
     private static List<String> supplierWords(String supplier) {

@@ -3,6 +3,7 @@ package com.dockmind.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
@@ -10,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "purchase_orders")
+@Table(name = "purchase_orders", indexes = @Index(name = "ix_purchase_orders_status", columnList = "status"))
 public class PurchaseOrder {
     @Id
     private String id;

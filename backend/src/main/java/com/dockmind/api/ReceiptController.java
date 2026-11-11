@@ -36,9 +36,13 @@ public class ReceiptController {
         this.capture = capture;
     }
 
+    /** A2. Newest first, pages of 50 by default. */
     @GetMapping
-    public List<ReceiptView> list(@RequestParam(required = false) String status) {
-        return receipts.list(parseStatus(status));
+    public ResponseEntity<List<ReceiptView>> list(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return Paging.respond(receipts.list(parseStatus(status), Paging.of(page, size)));
     }
 
     @GetMapping("/{id}")

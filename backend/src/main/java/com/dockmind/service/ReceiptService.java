@@ -5,8 +5,10 @@ import com.dockmind.ai.Extractor.OpenPo;
 import com.dockmind.ai.Extractor.OpenPoLine;
 import com.dockmind.ai.ValidatedExtraction;
 import com.dockmind.api.ApiException;
+import com.dockmind.api.PurchaseOrderView;
 import com.dockmind.api.ReceiptView;
 import com.dockmind.domain.PoLine;
+import com.dockmind.domain.PoNumbers;
 import com.dockmind.domain.PurchaseOrder;
 import com.dockmind.domain.PurchaseOrderRepository;
 import com.dockmind.domain.Receipt;
@@ -20,7 +22,10 @@ import com.dockmind.matching.Matcher.OrderLine;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,12 +51,38 @@ public class ReceiptService {
     public record StoredImage(byte[] data, String mimeType) {
     }
 
+    public record PageOf<T>(List<T> items, long total) {
+    }
+
+    /** A2, newest first, one page at a time. */
     @Transactional(readOnly = true)
-    public List<ReceiptView> list(ReceiptStatus status) {
-        List<Receipt> found = status == null
-                ? receipts.findAllByOrderByCreatedAtDescIdDesc()
-                : receipts.findByStatusOrderByCreatedAtDescIdDesc(status);
-        return found.stream().map(ReceiptView::from).toList();
+    public PageOf<ReceiptView> list(ReceiptStatus status, Pageable page) {
+        Page<Receipt> found = status == null
+                ? receipts.findAllByOrderByCreatedAtDescIdDesc(page)
+                : receipts.findByStatusOrderByCreatedAtDescIdDesc(status, page);
+        return new PageOf<>(found.map(ReceiptView::from).getContent(), found.getTotalElements());
+    }
+
+    /** A1. {@code query} matches part of a PO number or supplier, ignoring case. */
+    @Transactional(readOnly = true)
+    public PageOf<PurchaseOrderView> purchaseOrders(String status, String query, Pageable page) {
+        String pattern = query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+        Page<PurchaseOrder> found = purchaseOrders.search(status, pattern, page);
+        return new PageOf<>(found.map(PurchaseOrderView::from).getContent(), found.getTotalElements());
+    }
+
+    /** One indexed lookup per read, so the cost does not grow with the number of POs. */
+    @Transactional(readOnly = true)
+    public Optional<OpenPo> findOpenPo(String writtenPoNumber) {
+        List<String> keys = PoNumbers.lookupKeys(writtenPoNumber);
+        if (keys.isEmpty()) {
+            return Optional.empty();
+        }
+        return purchaseOrders.findByPoNumberInAndStatus(keys, OPEN).stream()
+                .findFirst()
+                .map(po -> new OpenPo(po.getPoNumber(), po.getSupplier(), po.getLines().stream()
+                        .map(line -> new OpenPoLine(line.getId(), line.getDescription(), line.getOrderedQty(), line.getUnit()))
+                        .toList()));
     }
 
     @Transactional(readOnly = true)
@@ -83,7 +114,7 @@ public class ReceiptService {
 
     @Transactional(readOnly = true)
     public List<Long> stuckInCaptured() {
-        return receipts.findByStatusOrderByCreatedAtDescIdDesc(ReceiptStatus.CAPTURED).stream().map(Receipt::getId).toList();
+        return receipts.findByStatus(ReceiptStatus.CAPTURED).stream().map(Receipt::getId).toList();
     }
 
     /** What the reader needs, or empty if this receipt no longer waits for extraction. */
@@ -92,15 +123,7 @@ public class ReceiptService {
         return receipts.findById(id)
                 .filter(receipt -> receipt.getStatus() == ReceiptStatus.CAPTURED)
                 .flatMap(receipt -> images.findById(id).map(image -> new ExtractionRequest(image.getData(),
-                        image.getMimeType(), receipt.getFileName(), receipt.getFixtureHeader(), openPos())));
-    }
-
-    private List<OpenPo> openPos() {
-        return purchaseOrders.findByStatusOrderById(OPEN).stream()
-                .map(po -> new OpenPo(po.getPoNumber(), po.getSupplier(), po.getLines().stream()
-                        .map(line -> new OpenPoLine(line.getId(), line.getDescription(), line.getOrderedQty(), line.getUnit()))
-                        .toList()))
-                .toList();
+                        image.getMimeType(), receipt.getFileName(), receipt.getFixtureHeader())));
     }
 
     /** Saves a validated result. Applies only while CAPTURED, so a re-run cannot overwrite later work. */
@@ -125,6 +148,10 @@ public class ReceiptService {
             line.setAiQty(extracted.qty());
             line.setUnit(extracted.unit());
             line.setConfidence(extracted.confidence());
+        }
+        if (!result.manual()) {
+            // The reader never saw the PO, so its lines are tied to the PO's lines here, in code.
+            matcher.linkByDescription(receipt.getLines(), orderLines(receipt.getPoNumber()));
         }
         recompute(receipt);
         receipt.setStatus(result.manual() ? ReceiptStatus.NEEDS_MANUAL : ReceiptStatus.EXTRACTED);

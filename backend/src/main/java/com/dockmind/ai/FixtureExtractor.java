@@ -18,8 +18,9 @@ public class FixtureExtractor implements Extractor {
     static final String GARBAGE = "garbage";
     static final String GARBAGE_TEXT = "Sorry, I could not make out this delivery note.";
 
-    private static final Set<String> KNOWN = Set.of("note-1", "note-2", "note-3", GARBAGE);
-    private static final Pattern NOTE_IN_FILE_NAME = Pattern.compile("note-[123]");
+    private static final Set<String> KNOWN = Set.of("note-1", "note-2", "note-3", "note-4", "note-5", "note-6",
+            "note-7", "note-8", "note-9", GARBAGE);
+    private static final Pattern NOTE_IN_FILE_NAME = Pattern.compile("note-[1-9]");
 
     private final String defaultFixture;
 

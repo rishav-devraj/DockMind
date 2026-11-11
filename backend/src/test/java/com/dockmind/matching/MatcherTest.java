@@ -239,6 +239,20 @@ class MatcherTest {
     }
 
     @Test
+    void linkingByDescriptionKeepsExistingLinksAndDoesNotReuseThem() {
+        TestLine linked = TestLine.of("L1", "72", "KG");
+        linked.description = "Something else";
+        TestLine salmon = TestLine.of(null, "1", "KG");
+        salmon.description = "Salmon fillet";
+        TestLine prawns = TestLine.of(null, "40", "KG");
+        prawns.description = "Prawns, tiger";
+        matcher.linkByDescription(List.of(linked, salmon, prawns), List.of(SALMON, PRAWNS));
+        assertThat(linked.poLineId).isEqualTo("L1");
+        assertThat(salmon.poLineId).isNull();
+        assertThat(prawns.poLineId).isEqualTo("L2");
+    }
+
+    @Test
     void eachOrderLineLinksOnlyOnce() {
         TestLine first = TestLine.of(null, "1", "KG");
         first.description = "Salmon fillet";

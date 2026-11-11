@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.SequenceGenerator;
@@ -19,8 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "receipts", uniqueConstraints =
-        @UniqueConstraint(name = "uk_receipts_idempotency_key", columnNames = "idempotency_key"))
+@Table(name = "receipts",
+        uniqueConstraints = @UniqueConstraint(name = "uk_receipts_idempotency_key", columnNames = "idempotency_key"),
+        indexes = {
+            @Index(name = "ix_receipts_created_at", columnList = "createdAt"),
+            @Index(name = "ix_receipts_status_created_at", columnList = "status, createdAt")
+        })
 public class Receipt {
     public static final int TEXT_LIMIT = 2000;
     public static final int NAME_LIMIT = 255;

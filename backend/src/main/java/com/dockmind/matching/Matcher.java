@@ -149,9 +149,22 @@ public final class Matcher {
      * shortens a name ("Cheddar" for "Cheddar, mature"). Each order line is linked at most once.
      */
     public <L extends Line> void relinkByDescription(List<L> lines, List<OrderLine> order) {
-        Set<String> taken = new HashSet<>();
         lines.forEach(line -> line.setPoLineId(null));
+        linkByDescription(lines, order);
+    }
+
+    /**
+     * Links only the lines that have no link yet, by the same rules as {@link #relinkByDescription}. Existing links
+     * are kept and their order lines are not offered again. The reader never sees the PO, so this is how its lines
+     * are tied to the order.
+     */
+    public <L extends Line> void linkByDescription(List<L> lines, List<OrderLine> order) {
+        Set<String> taken = new HashSet<>();
+        lines.stream().map(Line::getPoLineId).filter(java.util.Objects::nonNull).forEach(taken::add);
         for (L line : lines) {
+            if (line.getPoLineId() != null) {
+                continue;
+            }
             String description = normalizeDescription(line.getDescription());
             order.stream()
                     .filter(o -> !taken.contains(o.id()))

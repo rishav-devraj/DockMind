@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.dockmind.ai.Extractor.OpenPo;
 import com.dockmind.ai.Extractor.OpenPoLine;
+import com.dockmind.domain.PoNumbers;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,11 @@ class ExtractionValidatorTest {
             new OpenPo("PO-4513", "Green Valley Eggs", List.of(
                     new OpenPoLine("POL-4513-1", "Eggs, large, tray", new BigDecimal("120"), "TRAY"))));
 
+    /** Stands in for the indexed database lookup, with the same number normalisation. */
+    private static final PoLookup LOOKUP = written -> POS.stream()
+            .filter(po -> PoNumbers.lookupKeys(written).contains(po.poNumber()))
+            .findFirst();
+
     private static String answer(String po, String supplier, String lines) {
         return """
                 {"supplierName": %s, "deliveryNoteNo": "DN-1", "poNumber": %s, "poConfidence": 0.9,
@@ -34,12 +40,12 @@ class ExtractionValidatorTest {
     private static final String GOOD = answer("\"PO-4502\"", "\"Blue Ocean Seafood Co.\"", GOOD_LINE);
 
     private ValidatedExtraction lineAnswer(String line) {
-        return validator.validate(answer("\"PO-4502\"", "\"Blue Ocean Seafood Co.\"", "[" + line + "]"), POS);
+        return validator.validate(answer("\"PO-4502\"", "\"Blue Ocean Seafood Co.\"", "[" + line + "]"), LOOKUP);
     }
 
     @Test
     void acceptsAGoodAnswer() {
-        ValidatedExtraction result = validator.validate(GOOD, POS);
+        ValidatedExtraction result = validator.validate(GOOD, LOOKUP);
         assertThat(result.manual()).isFalse();
         assertThat(result.poNumber()).isEqualTo("PO-4502");
         assertThat(result.lines().get(0).poLineId()).isEqualTo("POL-4502-1");
@@ -48,18 +54,18 @@ class ExtractionValidatorTest {
 
     @Test
     void stripsMarkdownFences() {
-        assertThat(validator.validate("```json\n" + GOOD + "\n```", POS).manual()).isFalse();
+        assertThat(validator.validate("```json\n" + GOOD + "\n```", LOOKUP).manual()).isFalse();
     }
 
     @Test
     void stripsChatterAroundTheJson() {
-        assertThat(validator.validate("Here you go:\n" + GOOD + "\nHope that helps!", POS).manual()).isFalse();
+        assertThat(validator.validate("Here you go:\n" + GOOD + "\nHope that helps!", LOOKUP).manual()).isFalse();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"", "   ", "Sorry, I cannot read this.", "{not json", "[1,2,3]", "{}", "{\"lines\":\"none\"}", "{\"lines\":[]}", "null"})
     void unusableAnswersEndManual(String raw) {
-        ValidatedExtraction result = validator.validate(raw, POS);
+        ValidatedExtraction result = validator.validate(raw, LOOKUP);
         assertThat(result.manual()).isTrue();
         assertThat(result.poNumber()).isNull();
         assertThat(result.aiNote()).isEqualTo(ExtractionValidator.UNREADABLE_NOTE);
@@ -67,7 +73,7 @@ class ExtractionValidatorTest {
 
     @Test
     void nullAnswerEndsManual() {
-        assertThat(validator.validate(null, POS).manual()).isTrue();
+        assertThat(validator.validate(null, LOOKUP).manual()).isTrue();
     }
 
     @Test
@@ -112,7 +118,7 @@ class ExtractionValidatorTest {
 
     @Test
     void unknownPoNumberEndsManual() {
-        ValidatedExtraction result = validator.validate(answer("\"PO-9999\"", "\"Blue Ocean Seafood Co.\"", GOOD_LINE), POS);
+        ValidatedExtraction result = validator.validate(answer("\"PO-9999\"", "\"Blue Ocean Seafood Co.\"", GOOD_LINE), LOOKUP);
         assertThat(result.manual()).isTrue();
         assertThat(result.poNumber()).isNull();
         assertThat(result.lines().get(0).poLineId()).isNull();
@@ -120,14 +126,14 @@ class ExtractionValidatorTest {
 
     @Test
     void nullPoNumberEndsManual() {
-        assertThat(validator.validate(answer("null", "\"Blue Ocean Seafood Co.\"", GOOD_LINE), POS).manual()).isTrue();
+        assertThat(validator.validate(answer("null", "\"Blue Ocean Seafood Co.\"", GOOD_LINE), LOOKUP).manual()).isTrue();
     }
 
     @Test
     void supplierDisagreementEndsManualAndClearsLinks() {
         String raw = answer("\"PO-4513\"", "\"Dairy Direct\"",
                 "[{\"description\":\"Milk 1L\",\"poLineId\":\"POL-4503-1\",\"qty\":252,\"unit\":\"EA\",\"confidence\":0.7}]");
-        ValidatedExtraction result = validator.validate(raw, POS);
+        ValidatedExtraction result = validator.validate(raw, LOOKUP);
         assertThat(result.manual()).isTrue();
         assertThat(result.poNumber()).isNull();
         assertThat(result.supplier()).isEqualTo("Dairy Direct");
@@ -138,12 +144,12 @@ class ExtractionValidatorTest {
 
     @Test
     void missingSupplierEndsManual() {
-        assertThat(validator.validate(answer("\"PO-4502\"", "null", GOOD_LINE), POS).manual()).isTrue();
+        assertThat(validator.validate(answer("\"PO-4502\"", "null", GOOD_LINE), LOOKUP).manual()).isTrue();
     }
 
     @Test
     void supplierComparisonIgnoresCaseAndCompanySuffix() {
-        ValidatedExtraction result = validator.validate(answer("\"po 4502\"", "\"BLUE OCEAN SEAFOOD\"", GOOD_LINE), POS);
+        ValidatedExtraction result = validator.validate(answer("\"po 4502\"", "\"BLUE OCEAN SEAFOOD\"", GOOD_LINE), LOOKUP);
         assertThat(result.manual()).isFalse();
         assertThat(result.poNumber()).isEqualTo("PO-4502");
         assertThat(result.supplier()).isEqualTo("Blue Ocean Seafood Co.");
@@ -173,7 +179,7 @@ class ExtractionValidatorTest {
     @Test
     void overlongTextIsTruncated() {
         String longNote = "x".repeat(5000);
-        ValidatedExtraction result = validator.validate(GOOD.replace("\"note\"", "\"" + longNote + "\""), POS);
+        ValidatedExtraction result = validator.validate(GOOD.replace("\"note\"", "\"" + longNote + "\""), LOOKUP);
         assertThat(result.aiNote()).hasSize(2000);
     }
 }

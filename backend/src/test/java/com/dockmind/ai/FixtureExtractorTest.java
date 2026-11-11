@@ -3,7 +3,6 @@ package com.dockmind.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.dockmind.ai.Extractor.ExtractionRequest;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class FixtureExtractorTest {
@@ -21,7 +20,7 @@ class FixtureExtractorTest {
 
     @Test
     void unknownHeaderFallsThrough() {
-        assertThat(extractor.choose("note-9", "note-2-short.png")).isEqualTo("note-2");
+        assertThat(extractor.choose("note-99", "note-2-short.png")).isEqualTo("note-2");
     }
 
     @Test
@@ -31,13 +30,13 @@ class FixtureExtractorTest {
 
     @Test
     void garbageReturnsUnparseableText() throws Exception {
-        String raw = extractor.extract(new ExtractionRequest(new byte[0], "image/png", "x.png", "garbage", List.of()));
+        String raw = extractor.extract(new ExtractionRequest(new byte[0], "image/png", "x.png", "garbage"));
         assertThat(raw).doesNotContain("{");
     }
 
     @Test
     void returnsKitFixture() throws Exception {
-        String raw = extractor.extract(new ExtractionRequest(new byte[0], "image/png", "x.png", "note-2", List.of()));
+        String raw = extractor.extract(new ExtractionRequest(new byte[0], "image/png", "x.png", "note-2"));
         assertThat(raw).contains("PO-4502").contains("Scallops");
     }
 }
