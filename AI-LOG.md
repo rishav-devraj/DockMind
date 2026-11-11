@@ -15,6 +15,9 @@ Tool: Claude Code, running one coordinating session and two parallel agents (bac
 
    We changed it to read first, then look up. The model now gets only the photo and returns the PO number exactly as written, or null if any character is unclear. Code finds that PO with one indexed query and links the lines to it by description. The prompt is now a fixed 1,771 characters, whatever the number of POs. A1 and A2 also became paged and searchable, and indexes were added. We checked it by loading 100,004 open POs. A page of POs came back in about 0.15 seconds, a search in under 0.1 seconds, and all nine kit notes read correctly through real Gemini. The messy note now goes to a clerk instead of being guessed.
 
+
+3. The expo login fiasco, it took me 30 minutes to finally get the app to run on my iphone, there was some auth issue paired with expo login and i was unable to login with the normal method
+
 ## What we rewrote by hand, and why
 
 To be completed by the person submitting. This must be a real edit.

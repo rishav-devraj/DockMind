@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { apiUrl } from '../config';
 import { useIsOnline } from '../lib/network';
 import { colors, spacing, type } from '../theme';
 
@@ -16,6 +17,9 @@ export function Screen({ children }: { children: ReactNode }) {
           <Text style={styles.bannerText}>No signal. Photos are saved and upload later.</Text>
         </View>
       )}
+      <Text style={styles.server} selectable>
+        Server: {apiUrl}
+      </Text>
       {children}
     </View>
   );
@@ -23,6 +27,12 @@ export function Screen({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  server: {
+    color: colors.textMuted,
+    fontSize: 11,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+  },
   banner: { backgroundColor: colors.offlineBg, padding: spacing.md },
   bannerText: {
     color: colors.offlineText,
