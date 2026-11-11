@@ -166,8 +166,8 @@ describe('UploadQueue', () => {
   });
 
   it.each([
-    [400, 'Idempotency-Key is required.', 'Idempotency-Key is required.'],
-    [413, 'Too big', 'This photo is too large to upload.'],
+    [400, 'Idempotency-Key is required.', 'Idempotency-Key is required. (HTTP 400)'],
+    [413, 'Too big', 'This photo is too large to upload. (HTTP 413)'],
   ])('moves a %i to FAILED with a readable reason', async (status, message, reason) => {
     const h = harness();
     h.setUpload(async () => {

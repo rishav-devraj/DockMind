@@ -49,12 +49,12 @@ export interface QueueDeps {
 export function classifyUploadError(error: unknown): UploadOutcome {
   if (error instanceof ApiError) {
     const transient = error.status >= 500 || error.status === 408 || error.status === 429;
-    if (!transient) {
-      const reason = error.status === 413 ? 'This photo is too large to upload.' : error.message;
-      return { kind: 'fail', reason };
-    }
+    const text = error.status === 413 ? 'This photo is too large to upload.' : plainMessage(error);
+    // The status code is shown so the clerk or a developer can see exactly what the server said.
+    const reason = `${text} (HTTP ${error.status})`;
+    return transient ? { kind: 'retry', reason } : { kind: 'fail', reason };
   }
-  return { kind: 'retry', reason: plainMessage(error) };
+  return { kind: 'retry', reason: `${plainMessage(error)} (no HTTP response)` };
 }
 
 export class UploadQueue {

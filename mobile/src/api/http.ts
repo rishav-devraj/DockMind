@@ -112,7 +112,9 @@ export class HttpApiClient implements ApiClient {
           signal: controller.signal,
         });
         text = await response.text();
-      } catch {
+      } catch (error) {
+        // The real reason (DNS, TLS, connection refused, body too large) is kept in the Metro log.
+        console.warn(`[api] ${init.method ?? 'GET'} ${this.baseUrl}${path} failed`, error);
         throw new NetworkError(timedOut ? 'Request timed out' : 'Network request failed', timedOut);
       }
 
