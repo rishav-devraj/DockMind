@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DockMind flyer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #2f2a4a;
+    --ink-soft: #5d5778;
+    --lavender: #c9b8f5;
+    --lavender-deep: #7c63c9;
+    --mint: #b5ecd6;
+    --mint-deep: #2f8f70;
+    --peach: #ffd3b6;
+    --peach-deep: #c0672f;
+    --sky: #bfe3fb;
+    --sky-deep: #2f74a8;
+    --glass: rgba(255,255,255,.42);
+    --glass-edge: rgba(255,255,255,.8);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 1600px; }
+  body {
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 15% 15%, #e7dcff 0, transparent 45%),
+      radial-gradient(circle at 88% 22%, #d4f4ea 0, transparent 42%),
+      radial-gradient(circle at 80% 90%, #ffe0cc 0, transparent 45%),
+      radial-gradient(circle at 15% 92%, #cfe9fc 0, transparent 42%),
+      linear-gradient(160deg, #f6f1ff 0%, #fdf4fa 50%, #effaf6 100%);
+    position: relative; overflow: hidden;
+    padding: 80px 90px;
+  }
+  .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .6; }
+  .orb.a { width: 480px; height: 480px; background: #d9c9ff; top: -120px; left: -120px; }
+  .orb.b { width: 420px; height: 420px; background: #b9f0dc; bottom: -140px; right: -100px; }
+  .orb.c { width: 300px; height: 300px; background: #ffd0b8; top: 680px; right: 60px; }
+  .glass {
+    position: relative; z-index: 1;
+    background: var(--glass);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--glass-edge);
+    border-radius: 40px;
+    box-shadow: 0 18px 60px rgba(110,90,160,.18), inset 0 1px 0 rgba(255,255,255,.8);
+    padding: 64px 70px;
+  }
+  .kicker {
+    font-family: "JetBrains Mono", monospace; font-size: 22px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--lavender-deep); display: flex; align-items: center; gap: 16px;
+  }
+  .kicker::before { content: ""; width: 48px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--lavender-deep), var(--mint-deep)); }
+  .brand { font-size: 178px; font-weight: 800; letter-spacing: -0.045em; line-height: .92; margin-top: 28px; }
+  .brand .grad {
+    background: linear-gradient(100deg, var(--lavender-deep), var(--sky-deep) 45%, var(--mint-deep));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .subtitle { font-size: 44px; font-weight: 600; line-height: 1.25; margin-top: 30px; color: var(--ink); max-width: 880px; }
+  .sub2 { font-size: 27px; line-height: 1.55; color: var(--ink-soft); margin-top: 22px; max-width: 880px; }
+  .points { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 52px; }
+  .point {
+    background: rgba(255,255,255,.6); border: 1px solid #fff; border-radius: 28px; padding: 26px 28px;
+    box-shadow: 0 8px 24px rgba(110,90,160,.10);
+  }
+  .point .n { font-family: "JetBrains Mono", monospace; font-size: 20px; color: var(--lavender-deep); letter-spacing: .08em; }
+  .point h3 { font-size: 29px; font-weight: 800; margin: 8px 0 6px; letter-spacing: -.01em; }
+  .point p { font-size: 21px; line-height: 1.45; color: var(--ink-soft); }
+  .chips { margin-top: 44px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .chip {
+    font-family: "JetBrains Mono", monospace; font-size: 20px; padding: 10px 20px; border-radius: 999px;
+    border: 1px solid #fff; background: rgba(255,255,255,.7); color: var(--ink-soft);
+  }
+  .chip.lav { background: #e8ddff; color: var(--lavender-deep); }
+  .chip.mint { background: #d3f6e7; color: var(--mint-deep); }
+  .chip.peach { background: #ffe3d0; color: var(--peach-deep); }
+  .chip.sky { background: #d8eefc; color: var(--sky-deep); }
+  .foot {
+    position: relative; z-index: 1; margin-top: 52px; display: flex; justify-content: space-between; align-items: center;
+    font-family: "JetBrains Mono", monospace; font-size: 22px; color: var(--ink-soft);
+  }
+  .foot b { color: var(--ink); font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+
+  <section class="glass">
+    <div class="kicker">Harbor Foods · Dock receiving</div>
+    <h1 class="brand">Dock<span class="grad">Mind</span></h1>
+    <p class="subtitle">Photograph the delivery note. See what is short, over or wrong before the truck leaves.</p>
+    <p class="sub2">An AI reader turns the paper into lines, and plain code checks every quantity against the purchase order. Works offline, and never creates a duplicate.</p>
+
+    <div class="points">
+      <div class="point"><div class="n">01</div><h3>Capture</h3><p>Snap the note on a phone. Works in airplane mode.</p></div>
+      <div class="point"><div class="n">02</div><h3>Read</h3><p>A vision model reads the lines. It never does the arithmetic.</p></div>
+      <div class="point"><div class="n">03</div><h3>Compare</h3><p>Code matches each line: short, over, unit mismatch, not delivered.</p></div>
+      <div class="point"><div class="n">04</div><h3>Decide</h3><p>Correct a quantity, then confirm or dispute with a reason.</p></div>
+    </div>
+
+    <div class="chips">
+      <span class="chip lav">React Native · Expo</span>
+      <span class="chip mint">Spring Boot 3</span>
+      <span class="chip peach">Gemini vision</span>
+      <span class="chip sky">SQLite offline queue</span>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span><b>github.com/rishav-jha-mech</b></span>
+    <span>AI reads · code decides</span>
+  </div>
+</body>
+</html>
