@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "DockMind",
+    "slug": "dockmind",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,7 +23,9 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-build-properties"
-    ]
+      "expo-build-properties",
+      "expo-router"
+    ],
+    "scheme": "dockmind"
   }
 }
