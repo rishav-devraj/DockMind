@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { plainMessage } from '../api/errors';
@@ -20,18 +20,24 @@ export function PoPicker({ receiptId, onAssigned, onConflict }: PoPickerProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const { run, busy, error } = useAction(onConflict);
 
-  const load = useCallback(async () => {
-    setLoadError(null);
-    try {
-      setOrders((await loadOpenPurchaseOrders()).orders);
-    } catch (caught) {
-      setLoadError(plainMessage(caught));
-    }
-  }, []);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    loadOpenPurchaseOrders().then(
+      (list) => {
+        if (!active) return;
+        setOrders(list.orders);
+        setLoadError(null);
+      },
+      (caught) => {
+        if (active) setLoadError(plainMessage(caught));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
 
   const assign = (poNumber: string) =>
     void run(async () => onAssigned(await api.assignPurchaseOrder(receiptId, poNumber)));
@@ -41,7 +47,7 @@ export function PoPicker({ receiptId, onAssigned, onConflict }: PoPickerProps) {
       <Text style={styles.title}>Which purchase order is this?</Text>
       <Text style={styles.hint}>Check the number and supplier on the paper note.</Text>
       {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
-      {loadError ? <Button label="Try again" onPress={() => void load()} /> : null}
+      {loadError ? <Button label="Try again" onPress={() => setAttempt((value) => value + 1)} /> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.options}>
         {orders?.map((order) => (

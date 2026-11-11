@@ -23,7 +23,14 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-image-picker",

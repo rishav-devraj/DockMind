@@ -1,6 +1,7 @@
+import { useHeaderHeight } from '@react-navigation/elements';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { Receipt } from '@/api/types';
 import { Screen } from '@/components/Screen';
@@ -22,6 +23,7 @@ export default function Review() {
   const item = useQueueItems().find((candidate) => String(candidate.id) === params.itemId);
   const receiptId = params.receiptId ?? item?.receiptId ?? null;
   const { receipt, setReceipt, error, slow, retry } = useReceipt(receiptId);
+  const headerHeight = useHeaderHeight();
 
   let body;
   if (!receiptId && item?.status === 'FAILED') {
@@ -67,7 +69,9 @@ export default function Review() {
   return (
     <Screen>
       <Stack.Screen options={{ title: receipt?.id ?? 'Review' }} />
-      {body}
+      <KeyboardAvoidingView style={styles.fill} behavior="padding" keyboardVerticalOffset={headerHeight}>
+        {body}
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -191,6 +195,7 @@ function ReceiptReview({ receipt, onChange, onConflict }: ReceiptReviewProps) {
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.md },
   status: { fontSize: type.small, fontWeight: '700', color: colors.primary },
   po: { fontSize: type.heading, fontWeight: '700', color: colors.text },

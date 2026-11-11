@@ -1,5 +1,5 @@
 import { router, Stack } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { plainMessage } from '@/api/errors';
@@ -16,29 +16,38 @@ export default function OpenPurchaseOrders() {
   const [refreshing, setRefreshing] = useState(false);
   const pending = useQueueItems().filter((item) => item.status !== 'SYNCED').length;
 
-  const load = useCallback(async () => {
-    try {
-      setList(await loadOpenPurchaseOrders());
-      setError(null);
-    } catch (caught) {
-      setError(plainMessage(caught));
-    }
-  }, []);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    loadOpenPurchaseOrders()
+      .then(
+        (next) => {
+          if (!active) return;
+          setList(next);
+          setError(null);
+        },
+        (caught) => {
+          if (active) setError(plainMessage(caught));
+        },
+      )
+      .finally(() => {
+        if (active) setRefreshing(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
 
-  const refresh = useCallback(async () => {
+  const refresh = () => {
     setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+    setAttempt((value) => value + 1);
+  };
 
-  const retry = useCallback(() => {
+  const retry = () => {
     setError(null);
-    void load();
-  }, [load]);
+    setAttempt((value) => value + 1);
+  };
 
   let body;
   if (list) {

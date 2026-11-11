@@ -51,39 +51,39 @@ export default function Capture() {
   return (
     <Screen>
       <View style={styles.content}>
-      <Stack.Screen options={{ title: 'Capture note' }} />
-      <Text style={styles.intro}>Photograph the whole delivery note, flat and in good light.</Text>
-      {problem ? <Notice text={problem} /> : null}
-      {showFixtures ? (
-        <View style={styles.fixtures}>
-          <Text style={styles.fixtureTitle}>Test note</Text>
-          <View style={styles.fixtureRow}>
-            {FIXTURE_OPTIONS.map((option) => {
-              const selected = option.value === fixture;
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setFixture(option.value)}
-                  style={[styles.fixture, selected && styles.fixtureSelected]}
-                >
-                  <Text style={[styles.fixtureLabel, selected && styles.fixtureLabelSelected]}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+        <Stack.Screen options={{ title: 'Capture note' }} />
+        <Text style={styles.intro}>Photograph the whole delivery note, flat and in good light.</Text>
+        {problem ? <Notice text={problem} /> : null}
+        {showFixtures ? (
+          <View style={styles.fixtures}>
+            <Text style={styles.fixtureTitle}>Test note</Text>
+            <View style={styles.fixtureRow}>
+              {FIXTURE_OPTIONS.map((option) => {
+                const selected = option.value === fixture;
+                return (
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    onPress={() => setFixture(option.value)}
+                    style={[styles.fixture, selected && styles.fixtureSelected]}
+                  >
+                    <Text style={[styles.fixtureLabel, selected && styles.fixtureLabelSelected]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
-      ) : null}
-      <Button label="Take photo" onPress={() => run(takePhoto)} busy={busy} />
-      <Button
-        label="Choose from gallery"
-        variant="secondary"
-        onPress={() => run(pickFromGallery)}
-        disabled={busy}
-      />
+        ) : null}
+        <Button label="Take photo" onPress={() => run(takePhoto)} busy={busy} />
+        <Button
+          label="Choose from gallery"
+          variant="secondary"
+          onPress={() => run(pickFromGallery)}
+          disabled={busy}
+        />
       </View>
     </Screen>
   );
