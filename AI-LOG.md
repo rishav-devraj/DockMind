@@ -10,8 +10,8 @@ Tool: Claude Code, running one coordinating session and two parallel agents (bac
 
 ## What the AI got wrong
 
-1. To be completed from the build, with what we caught and how.
-2. To be completed from the build.
+1. Didnt create a .env file for the backend it was acting as if i would be hardcoding GEMINI AI API key in the code. I had to create a .env file and add the GEMINI API key there.
+2.
 
 ## What we rewrote by hand, and why
 
