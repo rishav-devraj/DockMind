@@ -1,1 +1,59 @@
 @import 'tailwindcss';
+
+@theme {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --color-bench: #14181e;
+  --color-bench-line: #2e3640;
+  --color-bench-muted: #98a3b1;
+  --color-hivis: #ffc72c;
+  --color-paper: #fbfaf5;
+  --color-ink: #14171c;
+  --color-muted: #5d6673;
+  --color-rule: #dcd8cb;
+  --color-flag: #fdf1cf;
+
+  --color-match: #0a7a4b;
+  --color-short: #c0271a;
+  --color-over: #b54708;
+  --color-unit: #6941c6;
+  --color-unknown: #3f4a5a;
+  --color-missing: #7a271a;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-hivis);
+  box-shadow: 0 0 18px 4px rgb(255 199 44 / 0.55);
+  animation: scan 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes scan {
+  from {
+    top: 0;
+  }
+  to {
+    top: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanline {
+    animation: none;
+    top: 50%;
+  }
+}
