@@ -53,7 +53,7 @@ export default function OpenPurchaseOrders() {
                 list.cachedAt,
               ).toLocaleTimeString()}.`}
             />
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           <Message title="No open purchase orders" detail="Pull down to check again." />
